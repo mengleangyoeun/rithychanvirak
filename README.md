@@ -1,36 +1,126 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Rithy Chanvirak Photography Portfolio
 
-## Getting Started
+A modern, responsive photography portfolio website built with Next.js, featuring stunning visual galleries, dynamic content management, and seamless user experiences.
 
-First, run the development server:
+## ✨ Features
 
+- **📸 Photography Portfolio** - Stunning gallery layouts with lightbox functionality
+- **🎨 Modern Design** - Clean, minimalist interface with unified background system
+- **📱 Fully Responsive** - Optimized for all devices and screen sizes
+- **⚡ Fast Performance** - Built with Next.js 15 and optimized images
+- **🎭 Smooth Animations** - Framer Motion for fluid interactions
+- **📊 Content Management** - Sanity CMS for easy content updates
+- **🔍 SEO Optimized** - Meta tags and structured data
+- **🎯 TypeScript** - Full type safety and better developer experience
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+ 
+- pnpm (recommended package manager)
+
+### Installation
+
+1. Clone the repository
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <your-repo-url>
+cd rithychanvireak
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies
+```bash
+pnpm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Set up environment variables
+```bash
+cp .env.example .env.local
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Run the development server
+```bash
+pnpm dev
+```
 
-## Learn More
+5. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-To learn more about Next.js, take a look at the following resources:
+## 🛠️ Tech Stack
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Framework**: Next.js 15 with App Router
+- **Styling**: Tailwind CSS + Custom CSS Variables
+- **Animations**: Framer Motion
+- **CMS**: Sanity.io
+- **Icons**: Lucide React + Simple Icons
+- **UI Components**: shadcn/ui
+- **Typography**: Inter, Geist, Livvic fonts
+- **Language**: TypeScript
+- **Package Manager**: pnpm
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 📁 Project Structure
 
-## Deploy on Vercel
+```
+├── app/                    # Next.js App Router pages
+│   ├── about/             # About page
+│   ├── contact/           # Contact page  
+│   ├── gallery/           # Photo gallery
+│   ├── collection/[slug]/ # Individual collections
+│   └── photo/[slug]/      # Individual photos
+├── components/            # Reusable components
+├── sanity/               # Sanity CMS configuration
+├── public/               # Static assets
+└── styles/               # Global styles
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🎨 Key Components
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Unified Background System** - Consistent animated backgrounds across all pages
+- **Gallery Grid** - Masonry layout with hover effects
+- **Photo Lightbox** - Fullscreen photo viewing experience
+- **Auto-scrolling Carousels** - Smooth infinite scroll galleries
+- **Responsive Navigation** - Mobile-friendly navigation system
+
+## 📱 Pages
+
+- **Home** - Hero section with featured collections and works
+- **Gallery** - Complete photo collection with filtering
+- **About** - Professional profile and experience
+- **Contact** - Social media links and contact information
+- **Collections** - Organized photo series
+- **Individual Photos** - Detailed photo views
+
+## 🔧 Development
+
+### Available Scripts
+
+```bash
+pnpm dev          # Start development server
+pnpm build        # Build for production  
+pnpm start        # Start production server
+pnpm lint         # Run ESLint
+```
+
+### Code Quality
+
+- **TypeScript** - Strict type checking enabled
+- **ESLint** - Code linting and formatting
+- **Prettier** - Code formatting (configured via ESLint)
+
+## 🚀 Deployment
+
+This project is optimized for deployment on Vercel:
+
+1. Connect your repository to Vercel
+2. Set up environment variables in Vercel dashboard
+3. Deploy with automatic builds on push
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=<your-repo-url>)
+
+## 📧 Contact
+
+- **Website**: [rithychanvirak.com](https://rithychanvirak.com)
+- **Email**: hello@rithychanvirak.com
+- **Instagram**: [@rithychanvirak](https://instagram.com/rithychanvirak)
+
+---
+
+Built with ❤️ by [mengleangyoeun](https://instagram.com/yourfavoriteeunc) 📱
