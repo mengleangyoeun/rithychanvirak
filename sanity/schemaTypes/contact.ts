@@ -39,7 +39,13 @@ export const contact = defineType({
                 ]
               }
             },
-            { name: 'url', type: 'string', title: 'URL' },
+            {
+              name: 'url',
+              type: 'string',
+              title: 'URL / Phone Number',
+              description: 'Enter phone number (e.g., 011899757) or URL',
+              placeholder: '011899757'
+            },
             {
               name: 'icon',
               type: 'string',

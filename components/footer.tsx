@@ -64,6 +64,13 @@ export function Footer() {
     link.platform === 'contact' || link.icon === 'Contact' || link.icon === 'Phone'
   )
 
+  // Add tel: prefix to phone link if needed
+  const phoneUrl = phoneLink?.url ? (
+    phoneLink.url.startsWith('http') || phoneLink.url.startsWith('tel:') || phoneLink.url.startsWith('mailto:')
+      ? phoneLink.url
+      : `tel:${phoneLink.url}`
+  ) : undefined
+
   const quickLinks = [
     { href: "/", label: "Home" },
     { href: "/gallery", label: "Gallery" },
@@ -105,12 +112,21 @@ export function Footer() {
                 const IconComponent = iconMap[link.icon] || Phone
                 const colorClass = colorMap[link.icon] || "hover:text-gray-300"
 
+                // Add tel: prefix for phone numbers
+                let url = link.url
+                const isPhone = link.platform?.toLowerCase() === 'contact' ||
+                               link.icon?.toLowerCase().includes('contact') ||
+                               link.icon?.toLowerCase().includes('phone')
+                if (isPhone && !url.startsWith('http') && !url.startsWith('tel:') && !url.startsWith('mailto:')) {
+                  url = `tel:${url}`
+                }
+
                 return (
                   <motion.a
                     key={link.platform}
-                    href={link.url}
-                    target={link.url.startsWith('http') ? '_blank' : '_self'}
-                    rel={link.url.startsWith('http') ? 'noopener noreferrer' : undefined}
+                    href={url}
+                    target={url.startsWith('http') ? '_blank' : '_self'}
+                    rel={url.startsWith('http') ? 'noopener noreferrer' : undefined}
                     whileHover={{ scale: 1.1, y: -2 }}
                     whileTap={{ scale: 0.95 }}
                     className={`w-12 h-12 bg-gray-800 border border-gray-700 rounded-xl flex items-center justify-center text-gray-400 hover:border-gray-600 transition-all duration-300 ${colorClass}`}
@@ -170,13 +186,13 @@ export function Footer() {
                   <span className="text-sm">{emailLink.url.replace('mailto:', '')}</span>
                 </a>
               )}
-              {phoneLink && (
+              {phoneUrl && (
                 <a
-                  href={phoneLink.url}
+                  href={phoneUrl}
                   className="flex items-center gap-3 text-gray-400 hover:text-white transition-colors"
                 >
                   <Phone className="w-5 h-5 text-green-400" />
-                  <span className="text-sm">{phoneLink.url.replace('tel:', '').replace('tel:+', '+')}</span>
+                  <span className="text-sm">{phoneUrl.replace('tel:', '').replace('tel:+', '+')}</span>
                 </a>
               )}
             </div>

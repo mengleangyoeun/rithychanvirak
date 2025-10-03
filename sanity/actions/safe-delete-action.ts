@@ -15,7 +15,6 @@ export const SafeDeleteAction: DocumentActionComponent = (props) => {
   const [isChecking, setIsChecking] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [confirmText, setConfirmText] = useState('')
   const [showForceMode, setShowForceMode] = useState(false)
 
   useEffect(() => {
@@ -55,10 +54,6 @@ export const SafeDeleteAction: DocumentActionComponent = (props) => {
   }
 
   const handleForceDelete = async () => {
-    if (confirmText !== 'DELETE ALL') {
-      return
-    }
-
     setIsDeleting(true)
     try {
       if (type === 'collection') {
@@ -93,6 +88,7 @@ export const SafeDeleteAction: DocumentActionComponent = (props) => {
       console.error('Force delete error:', error)
     } finally {
       setIsDeleting(false)
+      setDialogOpen(false)
     }
   }
 
@@ -123,7 +119,7 @@ export const SafeDeleteAction: DocumentActionComponent = (props) => {
       const refList = references.map(ref =>
         `${ref._type === 'collection' ? '📁' : '📸'} ${ref.title || ref._id}`
       ).join('\n')
-      return `⚠️ FORCE DELETE\n\nThis will permanently delete this ${type} and ALL items below (${references.length} items):\n\n${refList}\n\nType "DELETE ALL" in the confirmation prompt to proceed.`
+      return `⚠️ FORCE DELETE WARNING\n\nThis will permanently delete this ${type} and ALL ${references.length} items below:\n\n${refList}\n\nThis action CANNOT be undone!`
     }
 
     if (references.length > 0) {
@@ -150,7 +146,6 @@ export const SafeDeleteAction: DocumentActionComponent = (props) => {
     onHandle: () => {
       setDialogOpen(true)
       setShowForceMode(false)
-      setConfirmText('')
       checkReferences()
     },
     dialog: dialogOpen && {
@@ -159,7 +154,6 @@ export const SafeDeleteAction: DocumentActionComponent = (props) => {
       onCancel: () => {
         setDialogOpen(false)
         setShowForceMode(false)
-        setConfirmText('')
       },
       onConfirm: async () => {
         if (references.length > 0 && !showForceMode) {
@@ -168,10 +162,6 @@ export const SafeDeleteAction: DocumentActionComponent = (props) => {
         }
 
         if (references.length > 0 && showForceMode) {
-          const userInput = prompt(`Type "DELETE ALL" to confirm deletion of ${references.length + 1} items:`)
-          if (userInput !== 'DELETE ALL') {
-            return
-          }
           await handleForceDelete()
           return
         }

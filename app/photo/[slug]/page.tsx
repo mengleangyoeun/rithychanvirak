@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from 'react'
 import { client } from '@/sanity/lib/client'
+import { getOptimizedImageUrl } from '@/lib/cloudinary'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -26,6 +27,7 @@ interface Photo {
   captureDate?: string
   camera?: string
   lens?: string
+  location?: string
   settings?: {
     aperture?: string
     shutter?: string
@@ -61,6 +63,7 @@ async function getPhotoBySlug(slug: string) {
       camera,
       lens,
       settings,
+      location,
       _createdAt
     }
   `, { slug })
@@ -170,12 +173,12 @@ export default function PhotoPage({ params }: PhotoPageProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           
           {/* Photo */}
-          <div 
+          <div
             className="relative cursor-pointer group max-w-sm mx-auto"
             onClick={() => setFullscreenOpen(true)}
           >
             <Image
-              src={photo.imageUrl}
+              src={getOptimizedImageUrl(photo.imageId, 1280)}
               alt={photo.alt || photo.title}
               width={1280}
               height={0}
@@ -206,7 +209,7 @@ export default function PhotoPage({ params }: PhotoPageProps) {
             )}
 
             {/* Technical Details */}
-            {(photo.camera || photo.lens || photo.settings || photo.captureDate) && (
+            {(photo.camera || photo.lens || photo.settings || photo.captureDate || photo.location) && (
               <div>
                 <h2 className="text-lg font-semibold mb-3">Technical Details</h2>
                 <div className="grid grid-cols-2 gap-4">
@@ -214,6 +217,12 @@ export default function PhotoPage({ params }: PhotoPageProps) {
                     <div>
                       <dt className="text-sm font-medium text-muted-foreground">Date</dt>
                       <dd className="text-sm">{new Date(photo.captureDate).toLocaleDateString()}</dd>
+                    </div>
+                  )}
+                  {photo.location && (
+                    <div>
+                      <dt className="text-sm font-medium text-muted-foreground">Location</dt>
+                      <dd className="text-sm">{photo.location}</dd>
                     </div>
                   )}
                   {photo.camera && (
@@ -244,6 +253,12 @@ export default function PhotoPage({ params }: PhotoPageProps) {
                     <div>
                       <dt className="text-sm font-medium text-muted-foreground">ISO</dt>
                       <dd className="text-sm">{photo.settings.iso}</dd>
+                    </div>
+                  )}
+                  {photo.settings?.focalLength && (
+                    <div>
+                      <dt className="text-sm font-medium text-muted-foreground">Focal Length</dt>
+                      <dd className="text-sm">{photo.settings.focalLength}mm</dd>
                     </div>
                   )}
                 </div>
@@ -296,9 +311,10 @@ export default function PhotoPage({ params }: PhotoPageProps) {
       </div>
 
       {/* Related Photos */}
-      {relatedPhotos.length > 0 && (
-        <RelatedPhotos 
+      {relatedPhotos.length > 0 && photo?.collection && (
+        <RelatedPhotos
           photos={relatedPhotos}
+          collectionSlug={photo.collection.slug.current}
           onPhotoSelect={(index) => {
             setCurrentPhotoIndex(index)
             setFullscreenOpen(true)
@@ -315,7 +331,12 @@ export default function PhotoPage({ params }: PhotoPageProps) {
             imageUrl: photo.imageUrl,
             imageId: photo.imageId,
             alt: photo.alt,
-            slug: photo.slug
+            slug: photo.slug,
+            camera: photo.camera,
+            lens: photo.lens,
+            settings: photo.settings,
+            location: photo.location,
+            captureDate: photo.captureDate
           }}
           isOpen={fullscreenOpen}
           onClose={() => setFullscreenOpen(false)}
@@ -329,7 +350,7 @@ export default function PhotoPage({ params }: PhotoPageProps) {
           }))}
           currentIndex={currentPhotoIndex}
           onNavigate={(direction) => {
-            const nextIndex = direction === 'next' 
+            const nextIndex = direction === 'next'
               ? (currentPhotoIndex + 1) % relatedPhotos.length
               : currentPhotoIndex === 0 ? relatedPhotos.length - 1 : currentPhotoIndex - 1
             router.push(`/photo/${relatedPhotos[nextIndex].slug.current}`)

@@ -17,6 +17,16 @@ interface Photo {
   slug: {
     current: string
   }
+  camera?: string
+  lens?: string
+  settings?: {
+    aperture?: string
+    shutter?: string
+    iso?: string
+    focalLength?: string
+  }
+  location?: string
+  captureDate?: string
 }
 
 interface FullscreenPhotoPreviewProps {
@@ -37,6 +47,26 @@ export function FullscreenPhotoPreview({
   onNavigate
 }: FullscreenPhotoPreviewProps) {
   const [isLoading, setIsLoading] = useState(true)
+
+  // Preload next and previous images
+  useEffect(() => {
+    if (!isOpen || relatedPhotos.length <= 1) return
+
+    const nextIndex = (currentIndex + 1) % relatedPhotos.length
+    const prevIndex = currentIndex === 0 ? relatedPhotos.length - 1 : currentIndex - 1
+
+    const preloadImage = (imageId: string) => {
+      const img = new window.Image()
+      img.src = getOptimizedImageUrl(imageId, 1920)
+    }
+
+    if (relatedPhotos[nextIndex]?.imageId) {
+      preloadImage(relatedPhotos[nextIndex].imageId)
+    }
+    if (relatedPhotos[prevIndex]?.imageId) {
+      preloadImage(relatedPhotos[prevIndex].imageId)
+    }
+  }, [currentIndex, relatedPhotos, isOpen])
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (!isOpen) return
@@ -225,9 +255,11 @@ export function FullscreenPhotoPreview({
             )}
             
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.1, duration: 0.5, ease: "easeOut" }}
+              key={photo._id}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
               className="flex items-center justify-center"
             >
               <Image
@@ -235,7 +267,7 @@ export function FullscreenPhotoPreview({
                 alt={photo.alt || photo.title}
                 width={1920}
                 height={1280}
-                style={{ 
+                style={{
                   height: 'auto',
                   maxWidth: '85vw',
                   maxHeight: '75vh',
@@ -247,23 +279,67 @@ export function FullscreenPhotoPreview({
                 onLoad={() => setIsLoading(false)}
                 draggable={false}
                 priority
-                quality={95}
+                quality={90}
               />
             </motion.div>
           </div>
         </div>
 
         {/* Bottom Info Bar */}
-        <motion.div 
+        <motion.div
           initial={{ y: 50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.1, duration: 0.4 }}
           className="p-4 bg-black/80 backdrop-blur-sm border-t border-white/10"
         >
+          {/* Metadata Row */}
+          {(photo.camera || photo.lens || photo.settings || photo.location || photo.captureDate) && (
+            <div className="mb-3 flex flex-wrap items-center justify-center gap-x-4 md:gap-x-6 gap-y-2 text-xs md:text-sm text-white/70 px-2">
+              {photo.camera && (
+                <div className="flex items-center gap-2">
+                  <span className="text-white/50">📷</span>
+                  <span>{photo.camera}</span>
+                </div>
+              )}
+              {photo.lens && (
+                <div className="flex items-center gap-2">
+                  <span className="text-white/50">🔍</span>
+                  <span>{photo.lens}</span>
+                </div>
+              )}
+              {photo.settings && (
+                <div className="flex items-center gap-3">
+                  {photo.settings.aperture && <span>f/{photo.settings.aperture}</span>}
+                  {photo.settings.shutter && <span>{photo.settings.shutter}s</span>}
+                  {photo.settings.iso && <span>ISO {photo.settings.iso}</span>}
+                  {photo.settings.focalLength && <span>{photo.settings.focalLength}mm</span>}
+                </div>
+              )}
+              {photo.location && (
+                <div className="flex items-center gap-2">
+                  <span className="text-white/50">📍</span>
+                  <span>{photo.location}</span>
+                </div>
+              )}
+              {photo.captureDate && (
+                <div className="flex items-center gap-2">
+                  <span className="text-white/50">📅</span>
+                  <span>{new Date(photo.captureDate).toLocaleDateString()}</span>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="text-center">
-            <div className="text-white/70 text-sm">
-              {relatedPhotos.length > 1 ? 'Use arrow keys or buttons to navigate • ' : ''}
-              Click outside or press ESC to close
+            <div className="text-white/70 text-xs md:text-sm">
+              {relatedPhotos.length > 1 && (
+                <>
+                  <span className="hidden md:inline">Use arrow keys or buttons to navigate • </span>
+                  <span className="md:hidden">Swipe or tap buttons to navigate • </span>
+                </>
+              )}
+              <span className="hidden md:inline">Click outside or press ESC to close</span>
+              <span className="md:hidden">Tap outside to close</span>
             </div>
           </div>
         </motion.div>

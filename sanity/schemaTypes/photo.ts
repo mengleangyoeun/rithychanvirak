@@ -97,22 +97,43 @@ export const photo = defineType({
     defineField({
       name: 'camera',
       title: 'Camera',
-      type: 'string'
+      type: 'string',
+      description: 'Auto-filled from EXIF data if available'
     }),
     defineField({
       name: 'lens',
       title: 'Lens',
-      type: 'string'
+      type: 'string',
+      description: 'Auto-filled from EXIF data if available'
     }),
     defineField({
       name: 'settings',
       title: 'Camera Settings',
       type: 'object',
+      description: 'Auto-filled from EXIF data if available',
       fields: [
         { name: 'aperture', type: 'string', title: 'Aperture (f-stop)' },
         { name: 'shutter', type: 'string', title: 'Shutter Speed' },
         { name: 'iso', type: 'string', title: 'ISO' },
         { name: 'focalLength', type: 'string', title: 'Focal Length' }
+      ]
+    }),
+    defineField({
+      name: 'exifData',
+      title: 'EXIF Metadata',
+      type: 'object',
+      description: 'Raw EXIF data from the image',
+      readOnly: true,
+      fields: [
+        { name: 'make', type: 'string', title: 'Camera Make' },
+        { name: 'model', type: 'string', title: 'Camera Model' },
+        { name: 'lensModel', type: 'string', title: 'Lens Model' },
+        { name: 'fNumber', type: 'number', title: 'F-Number' },
+        { name: 'exposureTime', type: 'string', title: 'Exposure Time' },
+        { name: 'iso', type: 'number', title: 'ISO' },
+        { name: 'focalLength', type: 'number', title: 'Focal Length (mm)' },
+        { name: 'dateTimeOriginal', type: 'string', title: 'Date Taken' },
+        { name: 'software', type: 'string', title: 'Software' }
       ]
     }),
     defineField({
@@ -126,11 +147,12 @@ export const photo = defineType({
     select: {
       title: 'title',
       imageUrl: 'imageUrl',
+      imageId: 'imageId',
       collectionTitle: 'collection.title',
       featured: 'featured',
       order: 'order'
     },
-    prepare({ title, collectionTitle, featured, order }) {
+    prepare({ title, imageUrl, imageId, collectionTitle, featured, order }) {
       const parts = []
 
       // Collection
@@ -152,7 +174,10 @@ export const photo = defineType({
 
       return {
         title: title,
-        subtitle: parts.join(' • ')
+        subtitle: parts.join(' • '),
+        imageUrl: imageId
+          ? `https://res.cloudinary.com/dzu1sie4g/image/upload/c_thumb,w_200,h_200,g_auto/${imageId}`
+          : imageUrl
       }
     }
   },

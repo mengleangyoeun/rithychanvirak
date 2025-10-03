@@ -139,7 +139,16 @@ export default function ContactPage() {
               {contactData.socialLinks.map((social, index: number) => {
                 const IconComponent = iconMap[social.icon] || Phone
                 const colorClass = platformColors[social.icon] || platformColors[social.platform] || 'from-gray-500 to-gray-700'
-                const url = social.url || social.link || '#'
+                let url = social.url || social.link || '#'
+
+                // Add tel: prefix for phone numbers (if it's not already a URL)
+                const isPhone = social.platform?.toLowerCase() === 'contact' ||
+                               social.icon?.toLowerCase().includes('contact') ||
+                               social.icon?.toLowerCase().includes('phone')
+                if (isPhone && !url.startsWith('http') && !url.startsWith('tel:') && !url.startsWith('mailto:')) {
+                  url = `tel:${url}`
+                }
+
                 const isExternal = url.startsWith('http')
 
                 return (

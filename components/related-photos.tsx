@@ -17,10 +17,11 @@ interface Photo {
 
 interface RelatedPhotosProps {
   photos: Photo[]
+  collectionSlug?: string
   onPhotoSelect: (index: number) => void
 }
 
-export function RelatedPhotos({ photos, onPhotoSelect }: RelatedPhotosProps) {
+export function RelatedPhotos({ photos, collectionSlug, onPhotoSelect }: RelatedPhotosProps) {
   const staggerContainer = {
     animate: {
       transition: {
@@ -120,17 +121,17 @@ export function RelatedPhotos({ photos, onPhotoSelect }: RelatedPhotosProps) {
         </motion.div>
         
         {/* Call-to-action */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4, duration: 0.8 }}
           className="text-center mt-16"
         >
           <Link
-            href="/gallery"
+            href={collectionSlug ? `/collection/${collectionSlug}` : '/gallery'}
             className="group bg-gradient-to-r from-purple-600 to-blue-600 text-white inline-flex items-center text-lg px-8 py-4 hover:from-purple-700 hover:to-blue-700 transition-all duration-300 rounded-xl shadow-lg hover:shadow-xl font-bold"
           >
-            Explore Full Gallery
+            {collectionSlug ? 'Explore Full Collection' : 'Explore Full Gallery'}
             <ArrowRight className="w-5 h-5 ml-3 group-hover:translate-x-1 transition-transform" />
           </Link>
         </motion.div>

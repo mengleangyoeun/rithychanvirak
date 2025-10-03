@@ -7,7 +7,7 @@ import { urlFor } from '@/sanity/lib/image'
 import Image from 'next/image'
 import Link from 'next/link'
 import { motion } from 'motion/react'
-import { ArrowLeft, Folder, Eye } from 'lucide-react'
+import { ArrowLeft, Folder, Eye, ArrowUpDown } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import { FullscreenPhotoPreview } from '@/components/fullscreen-photo-preview'
 
@@ -21,6 +21,16 @@ interface Photo {
   imageHeight?: number
   alt: string
   description?: string
+  camera?: string
+  lens?: string
+  settings?: {
+    aperture?: string
+    shutter?: string
+    iso?: string
+    focalLength?: string
+  }
+  location?: string
+  captureDate?: string
 }
 
 interface Collection {
@@ -64,7 +74,7 @@ async function getCollectionBySlug(slug: string) {
 
 async function getCollectionPhotos(collectionId: string) {
   return client.fetch(`
-    *[_type == "photo" && references($collectionId)] | order(_createdAt desc) {
+    *[_type == "photo" && references($collectionId)] | order(_createdAt asc) {
       _id,
       title,
       slug,
@@ -73,7 +83,12 @@ async function getCollectionPhotos(collectionId: string) {
       imageWidth,
       imageHeight,
       alt,
-      description
+      description,
+      camera,
+      lens,
+      settings,
+      location,
+      captureDate
     }
   `, { collectionId })
 }
@@ -82,6 +97,7 @@ export default function CollectionPage({ params }: CollectionPageProps) {
   const resolvedParams = use(params)
   const [collection, setCollection] = useState<Collection | null>(null)
   const [photos, setPhotos] = useState<Photo[]>([])
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [loading, setLoading] = useState(true)
   const [fullscreenOpen, setFullscreenOpen] = useState(false)
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
@@ -111,6 +127,15 @@ export default function CollectionPage({ params }: CollectionPageProps) {
 
     fetchData()
   }, [resolvedParams.slug])
+
+  // Sort photos based on sortOrder
+  const sortedPhotos = [...photos].sort((a, b) => {
+    if (sortOrder === 'asc') {
+      return a._id.localeCompare(b._id)
+    } else {
+      return b._id.localeCompare(a._id)
+    }
+  })
 
   if (loading) {
     return (
@@ -153,8 +178,8 @@ export default function CollectionPage({ params }: CollectionPageProps) {
             className="mb-16"
           >
             <h1
-              className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-white mb-4 tracking-tight leading-none"
-              style={{ fontFamily: 'var(--font-livvic), sans-serif' }}
+              className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold text-white mb-4 tracking-tight leading-none"
+              style={{ fontFamily: 'var(--font-kantumruy-pro), sans-serif' }}
             >
               {collection.title}
             </h1>
@@ -248,40 +273,81 @@ export default function CollectionPage({ params }: CollectionPageProps) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.4 }}
             >
-              <h2 className="text-2xl font-bold text-white mb-6">Photos</h2>
-              <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 gap-4">
-                {photos.filter(photo => photo.imageUrl).map((photo, index) => (
-                  <motion.div
-                    key={photo._id}
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.5 + index * 0.05 }}
-                    className="break-inside-avoid mb-4 group cursor-pointer"
-                    onClick={() => {
-                      setSelectedPhoto(photo)
-                      setCurrentPhotoIndex(index)
-                      setFullscreenOpen(true)
-                    }}
-                  >
-                    <div className="relative overflow-hidden rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 transition-all duration-500 hover:border-white/20 hover:scale-[1.02]">
-                      <Image
-                        src={getThumbnailUrl(photo.imageId)}
-                        alt={photo.alt || photo.title}
-                        width={400}
-                        height={300}
-                        className="w-full h-auto"
-                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                      />
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white">Photos</h2>
+                <button
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/10 hover:border-white/20 rounded-lg text-white transition-all"
+                >
+                  <ArrowUpDown className="w-4 h-4" />
+                  <span className="text-sm">{sortOrder === 'asc' ? 'Oldest First' : 'Newest First'}</span>
+                </button>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 auto-rows-[150px] md:auto-rows-[200px] gap-3 md:gap-4">
+                {sortedPhotos.filter(photo => photo.imageUrl).map((photo, index) => {
+                  // Calculate aspect ratio to determine grid span
+                  const width = photo.imageWidth || 1200
+                  const height = photo.imageHeight || 900
+                  const aspectRatio = width / height
 
-                      {/* Hover Overlay */}
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                        <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
-                          <Eye className="w-6 h-6 text-white" />
+                  // Determine row and column span based on aspect ratio
+                  let colSpan = 'col-span-1'
+                  let rowSpan = 'row-span-1'
+
+                  if (aspectRatio > 1.5) {
+                    // Wide landscape
+                    colSpan = 'col-span-2'
+                    rowSpan = 'row-span-1'
+                  } else if (aspectRatio > 0.9 && aspectRatio <= 1.1) {
+                    // Square-ish
+                    colSpan = 'col-span-1'
+                    rowSpan = 'row-span-1'
+                  } else if (aspectRatio < 0.7) {
+                    // Tall portrait
+                    colSpan = 'col-span-1'
+                    rowSpan = 'row-span-2'
+                  } else if (aspectRatio <= 0.9) {
+                    // Portrait
+                    colSpan = 'col-span-1'
+                    rowSpan = 'row-span-2'
+                  } else {
+                    // Landscape
+                    colSpan = 'col-span-2'
+                    rowSpan = 'row-span-1'
+                  }
+
+                  return (
+                    <motion.div
+                      key={photo._id}
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.5, delay: 0.5 + index * 0.05 }}
+                      className={`group cursor-pointer ${colSpan} ${rowSpan}`}
+                      onClick={() => {
+                        setSelectedPhoto(photo)
+                        setCurrentPhotoIndex(index)
+                        setFullscreenOpen(true)
+                      }}
+                    >
+                      <div className="relative h-full overflow-hidden rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 transition-all duration-500 hover:border-white/20 hover:scale-[1.02]">
+                        <Image
+                          src={getThumbnailUrl(photo.imageId)}
+                          alt={photo.alt || photo.title}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                        />
+
+                        {/* Hover Overlay */}
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                          <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
+                            <Eye className="w-6 h-6 text-white" />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  )
+                })}
               </div>
             </motion.div>
           )}
@@ -320,28 +386,38 @@ export default function CollectionPage({ params }: CollectionPageProps) {
             imageUrl: selectedPhoto.imageUrl,
             imageId: selectedPhoto.imageId,
             alt: selectedPhoto.alt,
-            slug: selectedPhoto.slug
+            slug: selectedPhoto.slug,
+            camera: selectedPhoto.camera,
+            lens: selectedPhoto.lens,
+            settings: selectedPhoto.settings,
+            location: selectedPhoto.location,
+            captureDate: selectedPhoto.captureDate
           }}
           isOpen={fullscreenOpen}
           onClose={() => setFullscreenOpen(false)}
-          relatedPhotos={photos.filter(p => p.imageUrl).map(p => ({
+          relatedPhotos={sortedPhotos.filter(p => p.imageUrl).map(p => ({
             _id: p._id,
             title: p.title,
             imageUrl: p.imageUrl,
             imageId: p.imageId,
             alt: p.alt,
-            slug: p.slug
+            slug: p.slug,
+            camera: p.camera,
+            lens: p.lens,
+            settings: p.settings,
+            location: p.location,
+            captureDate: p.captureDate
           }))}
           currentIndex={currentPhotoIndex}
           onNavigate={(direction) => {
             if (direction === 'next') {
-              const nextIndex = (currentPhotoIndex + 1) % photos.length
+              const nextIndex = (currentPhotoIndex + 1) % sortedPhotos.length
               setCurrentPhotoIndex(nextIndex)
-              setSelectedPhoto(photos[nextIndex])
+              setSelectedPhoto(sortedPhotos[nextIndex])
             } else {
-              const prevIndex = currentPhotoIndex === 0 ? photos.length - 1 : currentPhotoIndex - 1
+              const prevIndex = currentPhotoIndex === 0 ? sortedPhotos.length - 1 : currentPhotoIndex - 1
               setCurrentPhotoIndex(prevIndex)
-              setSelectedPhoto(photos[prevIndex])
+              setSelectedPhoto(sortedPhotos[prevIndex])
             }
           }}
         />

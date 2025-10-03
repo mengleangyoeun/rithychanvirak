@@ -58,10 +58,23 @@ import React, { useState } from 'react'
 import { useClient } from 'sanity'
 import imageCompression from 'browser-image-compression'
 
+interface Collection {
+  _id: string
+  title: string
+  slug?: { current: string }
+  collectionType?: string
+  parentCollection?: {
+    title: string
+    slug: { current: string }
+  }
+}
+
 function BulkUploadComponent() {
   const client = useClient({ apiVersion: '2024-01-01' })
-  const [collections, setCollections] = useState<Array<{ _id: string; title: string }>>([])
+  const [collections, setCollections] = useState<Collection[]>([])
   const [selectedCollection, setSelectedCollection] = useState('')
+  const [newCollectionName, setNewCollectionName] = useState('')
+  const [showNewCollectionInput, setShowNewCollectionInput] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState('')
   const [currentFile, setCurrentFile] = useState('')
@@ -72,11 +85,24 @@ function BulkUploadComponent() {
   const [compressionSavings, setCompressionSavings] = useState({ original: 0, compressed: 0 })
 
   // Fetch collections on component mount
-  React.useEffect(() => {
+  const fetchCollections = () => {
     client
-      .fetch('*[_type == "collection"]{ _id, title, slug }')
+      .fetch(`*[_type == "collection"]{
+        _id,
+        title,
+        slug,
+        collectionType,
+        parentCollection-> {
+          title,
+          slug
+        }
+      }`)
       .then(setCollections)
       .catch(console.error)
+  }
+
+  React.useEffect(() => {
+    fetchCollections()
   }, [client])
 
   // Compress image before upload
@@ -105,12 +131,43 @@ function BulkUploadComponent() {
     }
   }
 
-  // Cloudinary upload function
-  const uploadToCloudinary = async (file: File): Promise<{ secure_url: string; public_id: string; width: number; height: number }> => {
+  // Create new collection
+  const createCollection = async (name: string): Promise<string> => {
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+
+    const collectionDoc = {
+      _type: 'collection',
+      title: name,
+      slug: {
+        _type: 'slug',
+        current: slug
+      }
+    }
+
+    const result = await client.create(collectionDoc)
+    await fetchCollections() // Refresh collections list
+    return result._id
+  }
+
+  // Cloudinary upload function with collection-based folder (supports nested sub-collections)
+  const uploadToCloudinary = async (file: File, collection: Collection): Promise<{ secure_url: string; public_id: string; width: number; height: number }> => {
+    // Create Cloudinary folder path from collection name
+    let cloudinaryFolder = 'photography-portfolio'
+
+    // If sub-collection, create nested folder structure
+    if (collection.parentCollection) {
+      const parentSlug = collection.parentCollection.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+      const childSlug = collection.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+      cloudinaryFolder = `photography-portfolio/${parentSlug}/${childSlug}`
+    } else {
+      const folderSlug = collection.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+      cloudinaryFolder = `photography-portfolio/${folderSlug}`
+    }
+
     const formData = new FormData()
     formData.append('file', file)
     formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'your_preset')
-    formData.append('folder', 'photography-portfolio')
+    formData.append('folder', cloudinaryFolder)
     // Add Cloudinary transformations for additional compression
     formData.append('quality', 'auto:good') // Auto-optimize quality
     formData.append('fetch_format', 'auto') // Auto-select best format (WebP, AVIF, etc.)
@@ -141,6 +198,17 @@ function BulkUploadComponent() {
     setCompressionSavings({ original: 0, compressed: 0 })
 
     try {
+      // Get collection info for Cloudinary folder
+      const selectedCollectionObj = collections.find(c => c._id === selectedCollection)
+      if (!selectedCollectionObj) {
+        throw new Error('Collection not found')
+      }
+
+      const collectionName = selectedCollectionObj.title
+      const displayPath = selectedCollectionObj.parentCollection
+        ? `${selectedCollectionObj.parentCollection.title} / ${collectionName}`
+        : collectionName
+
       const filesArray = Array.from(files)
 
       // Process files in batches of 3 for better performance
@@ -151,13 +219,13 @@ function BulkUploadComponent() {
         const batchPromises = batch.map(async (file, batchIndex) => {
           const globalIndex = i + batchIndex
           setCurrentFile(file.name)
-          setProgress(`🗜️ Compressing & uploading ${globalIndex + 1}/${filesArray.length}`)
+          setProgress(`🗜️ Compressing & uploading ${globalIndex + 1}/${filesArray.length} to ${displayPath}`)
 
           // Compress image before uploading
           const compressedFile = await compressImage(file)
 
-          // Upload compressed file to Cloudinary
-          const cloudinaryResult = await uploadToCloudinary(compressedFile)
+          // Upload compressed file to Cloudinary with collection folder (handles nested paths)
+          const cloudinaryResult = await uploadToCloudinary(compressedFile, selectedCollectionObj)
 
           // Create photo document with Cloudinary URLs
           const photoTitle = file.name.replace(/\.[^/.]+$/, '')
@@ -232,18 +300,27 @@ function BulkUploadComponent() {
     <div>
       {/* Collection Selection */}
       <div style={{ marginBottom: '2rem' }}>
-        <label style={{ 
-          display: 'block', 
-          marginBottom: '0.75rem', 
+        <label style={{
+          display: 'block',
+          marginBottom: '0.75rem',
           fontSize: '1.1rem',
           fontWeight: '600',
           color: '#374151'
         }}>
-          📂 Select Collection
+          📂 Select or Create Collection
         </label>
         <select
           value={selectedCollection}
-          onChange={(e) => setSelectedCollection(e.target.value)}
+          onChange={(e) => {
+            const value = e.target.value
+            if (value === '__new__') {
+              setShowNewCollectionInput(true)
+              setSelectedCollection('')
+            } else {
+              setShowNewCollectionInput(false)
+              setSelectedCollection(value)
+            }
+          }}
           style={{
             width: '100%',
             padding: '1rem',
@@ -265,12 +342,92 @@ function BulkUploadComponent() {
           }}
         >
           <option value="">Choose a collection...</option>
+          <option value="__new__" style={{ fontWeight: 'bold', color: '#667eea' }}>
+            ➕ Create New Collection
+          </option>
           {collections.map((collection) => (
             <option key={collection._id} value={collection._id}>
-              {collection.title}
+              {collection.parentCollection
+                ? `  └─ ${collection.title} (in ${collection.parentCollection.title})`
+                : collection.title}
             </option>
           ))}
         </select>
+
+        {/* New Collection Input */}
+        {showNewCollectionInput && (
+          <div style={{ marginTop: '1rem' }}>
+            <input
+              type="text"
+              value={newCollectionName}
+              onChange={(e) => setNewCollectionName(e.target.value)}
+              placeholder="Enter collection name..."
+              style={{
+                width: '100%',
+                padding: '1rem',
+                border: '2px solid #667eea',
+                borderRadius: '12px',
+                fontSize: '1rem',
+                outline: 'none',
+                marginBottom: '0.5rem'
+              }}
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                onClick={async () => {
+                  if (newCollectionName.trim()) {
+                    setProgress('📁 Creating collection...')
+                    try {
+                      const newCollectionId = await createCollection(newCollectionName.trim())
+                      setSelectedCollection(newCollectionId)
+                      setShowNewCollectionInput(false)
+                      setNewCollectionName('')
+                      setProgress('✅ Collection created!')
+                      setTimeout(() => setProgress(''), 2000)
+                    } catch (error) {
+                      console.error('Failed to create collection:', error)
+                      setProgress('❌ Failed to create collection')
+                      setTimeout(() => setProgress(''), 3000)
+                    }
+                  }
+                }}
+                disabled={!newCollectionName.trim()}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem 1rem',
+                  background: newCollectionName.trim() ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#e5e7eb',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: newCollectionName.trim() ? 'pointer' : 'not-allowed',
+                  fontWeight: '600',
+                  fontSize: '0.95rem'
+                }}
+              >
+                ✓ Create Collection
+              </button>
+              <button
+                onClick={() => {
+                  setShowNewCollectionInput(false)
+                  setNewCollectionName('')
+                }}
+                style={{
+                  padding: '0.75rem 1rem',
+                  background: '#f3f4f6',
+                  color: '#6b7280',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '0.95rem'
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Drag & Drop Upload Area */}

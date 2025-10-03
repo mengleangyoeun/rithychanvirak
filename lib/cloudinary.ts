@@ -52,12 +52,11 @@ export const getOptimizedImageUrl = (publicId: string, width: number = 800) => {
   })
 }
 
-export const getThumbnailUrl = (publicId: string) => {
+export const getThumbnailUrl = (publicId: string, width: number = 600) => {
   return buildCloudinaryUrl(publicId, {
-    width: 400,
-    height: 300,
+    width,
     quality: 'auto',
     format: 'auto',
-    crop: 'fill'
+    crop: 'fit'
   })
 }
