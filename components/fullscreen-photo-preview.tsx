@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { X, Download, Share2, ChevronLeft, ChevronRight, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -47,6 +47,11 @@ export function FullscreenPhotoPreview({
   onNavigate
 }: FullscreenPhotoPreviewProps) {
   const [isLoading, setIsLoading] = useState(true)
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null)
+  const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null)
+  const [scale, setScale] = useState(1)
+  const [isPinching, setIsPinching] = useState(false)
+  const imageRef = useRef<HTMLDivElement>(null)
 
   // Preload next and previous images
   useEffect(() => {
@@ -93,6 +98,7 @@ export function FullscreenPhotoPreview({
       document.addEventListener('keydown', handleKeyDown)
       document.body.style.overflow = 'hidden'
       setIsLoading(true)
+      setScale(1) // Reset scale when opening
     } else {
       document.removeEventListener('keydown', handleKeyDown)
       document.body.style.overflow = 'unset'
@@ -103,6 +109,82 @@ export function FullscreenPhotoPreview({
       document.body.style.overflow = 'unset'
     }
   }, [isOpen, handleKeyDown])
+
+  // Handle touch gestures for swipe navigation
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (isPinching || scale > 1) return // Don't swipe when zoomed
+    setTouchEnd(null)
+    setTouchStart({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY
+    })
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (isPinching || scale > 1) return // Don't swipe when zoomed
+    setTouchEnd({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY
+    })
+  }
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd || isPinching || scale > 1) return
+
+    const swipeThreshold = 50
+    const distanceX = touchStart.x - touchEnd.x
+    const distanceY = Math.abs(touchStart.y - touchEnd.y)
+
+    // Only trigger swipe if horizontal movement is greater than vertical
+    if (Math.abs(distanceX) > swipeThreshold && Math.abs(distanceX) > distanceY) {
+      if (distanceX > 0 && onNavigate && relatedPhotos.length > 1) {
+        onNavigate('next')
+      } else if (distanceX < 0 && onNavigate && relatedPhotos.length > 1) {
+        onNavigate('prev')
+      }
+    }
+
+    setTouchStart(null)
+    setTouchEnd(null)
+  }
+
+  // Handle pinch-to-zoom
+  const handlePinchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      setIsPinching(true)
+      e.preventDefault()
+    }
+  }
+
+  const handlePinchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && isPinching) {
+      e.preventDefault()
+      const touch1 = e.touches[0]
+      const touch2 = e.touches[1]
+
+      const distance = Math.sqrt(
+        Math.pow(touch2.clientX - touch1.clientX, 2) +
+        Math.pow(touch2.clientY - touch1.clientY, 2)
+      )
+
+      // Calculate scale based on initial distance (stored in a way that works)
+      const newScale = Math.min(Math.max(1, distance / 200), 3)
+      setScale(newScale)
+    }
+  }
+
+  const handlePinchEnd = () => {
+    setIsPinching(false)
+    // Reset scale if less than 1.1
+    if (scale < 1.1) {
+      setScale(1)
+    }
+  }
+
+  // Reset scale when photo changes
+  useEffect(() => {
+    setScale(1)
+  }, [photo._id])
 
   const handleDownload = async (e: React.MouseEvent) => {
     e.preventDefault()
@@ -247,20 +329,30 @@ export function FullscreenPhotoPreview({
           )}
 
           {/* Image Container */}
-          <div className="absolute inset-0 flex items-center justify-center" style={{ top: '60px', bottom: '80px' }}>
+          <div
+            ref={imageRef}
+            className="absolute inset-0 flex items-center justify-center touch-none"
+            style={{ top: '60px', bottom: '80px' }}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
             {isLoading && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin" />
               </div>
             )}
-            
+
             <motion.div
               key={photo._id}
               initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              animate={{ opacity: 1, scale }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
+              transition={{ duration: 0.2, scale: { duration: 0.1 } }}
               className="flex items-center justify-center"
+              onTouchStart={handlePinchStart}
+              onTouchMove={handlePinchMove}
+              onTouchEnd={handlePinchEnd}
             >
               <Image
                 src={getOptimizedImageUrl(photo.imageId, 1920)}
@@ -273,7 +365,8 @@ export function FullscreenPhotoPreview({
                   maxHeight: '75vh',
                   objectFit: 'contain',
                   display: 'block',
-                  margin: '0 auto'
+                  margin: '0 auto',
+                  touchAction: 'none'
                 }}
                 className="rounded-xl border-2 border-white/20 drop-shadow-2xl"
                 onLoad={() => setIsLoading(false)}
@@ -339,7 +432,12 @@ export function FullscreenPhotoPreview({
                 </>
               )}
               <span className="hidden md:inline">Click outside or press ESC to close</span>
-              <span className="md:hidden">Tap outside to close</span>
+              <span className="md:hidden">Pinch to zoom • Tap outside to close</span>
+              {scale > 1 && (
+                <span className="ml-2 text-blue-400">
+                  ({(scale * 100).toFixed(0)}%)
+                </span>
+              )}
             </div>
           </div>
         </motion.div>

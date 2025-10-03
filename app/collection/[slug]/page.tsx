@@ -321,7 +321,7 @@ export default function CollectionPage({ params }: CollectionPageProps) {
                       key={photo._id}
                       initial={{ opacity: 0, y: 30 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, delay: 0.5 + index * 0.05 }}
+                      transition={{ duration: 0.5, delay: 0.5 + Math.min(index * 0.05, 0.8) }}
                       className={`group cursor-pointer ${colSpan} ${rowSpan}`}
                       onClick={() => {
                         setSelectedPhoto(photo)
@@ -336,6 +336,7 @@ export default function CollectionPage({ params }: CollectionPageProps) {
                           fill
                           className="object-cover"
                           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                          loading={index < 12 ? 'eager' : 'lazy'}
                         />
 
                         {/* Hover Overlay */}
