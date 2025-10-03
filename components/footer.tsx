@@ -1,52 +1,68 @@
+'use client'
+
 import Link from "next/link"
 import { motion } from "motion/react"
 import { Mail, Phone, Camera, Heart } from "lucide-react"
 import { siInstagram, siTelegram, siFacebook, siGmail, siLintcode } from 'simple-icons'
 import type { SimpleIcon } from 'simple-icons'
 import type { LucideIcon } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { client } from '@/sanity/lib/client'
 
-interface SocialLink {
-  href: string
-  icon: SimpleIcon | LucideIcon
-  label: string
-  color: string
+interface ContactData {
+  socialLinks?: Array<{
+    platform: string
+    url: string
+    icon: string
+  }>
+}
+
+// Icon mapping
+const iconMap: { [key: string]: SimpleIcon | LucideIcon } = {
+  Contact: Phone,
+  Phone: Phone,
+  Telegram: siTelegram,
+  MessageCircle: siTelegram,
+  Facebook: siFacebook,
+  Instagram: siInstagram,
+  Gmail: siGmail,
+  Mail: Mail
+}
+
+// Color mapping
+const colorMap: { [key: string]: string } = {
+  Contact: "hover:text-green-400",
+  Phone: "hover:text-green-400",
+  Telegram: "hover:text-blue-400",
+  Facebook: "hover:text-blue-500",
+  Instagram: "hover:text-pink-400",
+  Gmail: "hover:text-red-400",
+  Mail: "hover:text-red-400"
+}
+
+async function getContactData() {
+  return client.fetch(`
+    *[_type == "contact"][0] {
+      socialLinks
+    }
+  `)
 }
 
 export function Footer() {
   const currentYear = new Date().getFullYear()
+  const [contactData, setContactData] = useState<ContactData | null>(null)
 
-  const socialLinks: SocialLink[] = [
-    {
-      href: "tel:+85511899757",
-      icon: Phone,
-      label: "Contact",
-      color: "hover:text-green-400"
-    },
-    {
-      href: "https://t.me/rithychanvirak",
-      icon: siTelegram,
-      label: "Telegram",
-      color: "hover:text-blue-400"
-    },
-    {
-      href: "https://facebook.com/rithychanvirak",
-      icon: siFacebook,
-      label: "Facebook",
-      color: "hover:text-blue-500"
-    },
-    {
-      href: "https://instagram.com/rithychanvirak",
-      icon: siInstagram,
-      label: "Instagram",
-      color: "hover:text-pink-400"
-    },
-    {
-      href: "mailto:hello@rithychanvirak.com",
-      icon: siGmail,
-      label: "Gmail",
-      color: "hover:text-red-400"
-    },
-  ]
+  useEffect(() => {
+    getContactData().then(data => setContactData(data))
+  }, [])
+
+  // Extract email and phone from contact data
+  const emailLink = contactData?.socialLinks?.find(link =>
+    link.platform === 'gmail' || link.icon === 'Gmail'
+  )
+  const phoneLink = contactData?.socialLinks?.find(link =>
+    link.platform === 'contact' || link.icon === 'Contact' || link.icon === 'Phone'
+  )
 
   const quickLinks = [
     { href: "/", label: "Home" },
@@ -85,25 +101,32 @@ export function Footer() {
             
             {/* Social Links */}
             <div className="flex items-center gap-4">
-              {socialLinks.map((link) => (
-                <motion.a
-                  key={link.label}
-                  href={link.href}
-                  whileHover={{ scale: 1.1, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={`w-12 h-12 bg-gray-800 border border-gray-700 rounded-xl flex items-center justify-center text-gray-400 hover:border-gray-600 transition-all duration-300 ${link.color}`}
-                  aria-label={link.label}
-                >
-                  {/* Handle both simple-icons and lucide-react icons */}
-                  {'path' in link.icon ? (
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                      <path d={link.icon.path} />
-                    </svg>
-                  ) : (
-                    <link.icon className="w-5 h-5" />
-                  )}
-                </motion.a>
-              ))}
+              {contactData?.socialLinks?.map((link) => {
+                const IconComponent = iconMap[link.icon] || Phone
+                const colorClass = colorMap[link.icon] || "hover:text-gray-300"
+
+                return (
+                  <motion.a
+                    key={link.platform}
+                    href={link.url}
+                    target={link.url.startsWith('http') ? '_blank' : '_self'}
+                    rel={link.url.startsWith('http') ? 'noopener noreferrer' : undefined}
+                    whileHover={{ scale: 1.1, y: -2 }}
+                    whileTap={{ scale: 0.95 }}
+                    className={`w-12 h-12 bg-gray-800 border border-gray-700 rounded-xl flex items-center justify-center text-gray-400 hover:border-gray-600 transition-all duration-300 ${colorClass}`}
+                    aria-label={link.platform}
+                  >
+                    {/* Handle both simple-icons and lucide-react icons */}
+                    {'path' in IconComponent ? (
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d={IconComponent.path} />
+                      </svg>
+                    ) : (
+                      <IconComponent className="w-5 h-5" />
+                    )}
+                  </motion.a>
+                )
+              })}
             </div>
           </motion.div>
 
@@ -138,14 +161,24 @@ export function Footer() {
           >
             <h4 className="text-lg font-bold mb-6 text-white">Get In Touch</h4>
             <div className="space-y-4">
-              <div className="flex items-center gap-3 text-gray-400">
-                <Mail className="w-5 h-5 text-blue-400" />
-                <span className="text-sm">hello@rithychanvirak.com</span>
-              </div>
-              <div className="flex items-center gap-3 text-gray-400">
-                <Phone className="w-5 h-5 text-green-400" />
-                <span className="text-sm">+855 11 899 757</span>
-              </div>
+              {emailLink && (
+                <a
+                  href={emailLink.url}
+                  className="flex items-center gap-3 text-gray-400 hover:text-white transition-colors"
+                >
+                  <Mail className="w-5 h-5 text-blue-400" />
+                  <span className="text-sm">{emailLink.url.replace('mailto:', '')}</span>
+                </a>
+              )}
+              {phoneLink && (
+                <a
+                  href={phoneLink.url}
+                  className="flex items-center gap-3 text-gray-400 hover:text-white transition-colors"
+                >
+                  <Phone className="w-5 h-5 text-green-400" />
+                  <span className="text-sm">{phoneLink.url.replace('tel:', '').replace('tel:+', '+')}</span>
+                </a>
+              )}
             </div>
             
             {/* <div className="mt-8 p-4 bg-gray-900/50 rounded-xl border border-gray-800">

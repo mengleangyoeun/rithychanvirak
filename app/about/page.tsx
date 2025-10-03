@@ -39,6 +39,12 @@ interface EquipmentCategory {
   items: string[]
 }
 
+interface Skill {
+  _key: string
+  name: string
+  icon?: string
+}
+
 interface AboutData {
   title?: string
   profileImage?: SanityImage
@@ -46,7 +52,7 @@ interface AboutData {
   tagline?: string
   bio?: Array<{ _type: string; [key: string]: unknown }> // PortableText content
   experience?: Experience[]
-  skills?: string[]
+  skills?: Skill[]
   awards?: Award[]
   equipment?: EquipmentCategory[]
 }
@@ -344,9 +350,9 @@ export default function AboutPage() {
               whileInView="animate"
               className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"
             >
-              {aboutData.skills.map((skill: string) => (
+              {aboutData.skills.map((skill: Skill) => (
                 <motion.div
-                  key={skill}
+                  key={skill._key}
                   variants={{
                     initial: { opacity: 0, y: 30, scale: 0.9 },
                     animate: { opacity: 1, y: 0, scale: 1 }
@@ -355,9 +361,13 @@ export default function AboutPage() {
                   className="bg-card border border-border rounded-2xl text-center py-6 px-4 hover:shadow-xl transition-all duration-300 group"
                 >
                   <div className="w-12 h-12 bg-secondary rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:bg-foreground transition-colors duration-300">
-                    <div className="w-6 h-6 bg-foreground rounded group-hover:bg-background transition-colors duration-300"></div>
+                    {skill.icon ? (
+                      <span className="text-2xl">{skill.icon}</span>
+                    ) : (
+                      <div className="w-6 h-6 bg-foreground rounded group-hover:bg-background transition-colors duration-300"></div>
+                    )}
                   </div>
-                  <p className="text-sm font-bold text-foreground group-hover:text-blue-500 transition-colors duration-300 leading-tight">{skill}</p>
+                  <p className="text-sm font-bold text-foreground group-hover:text-blue-500 transition-colors duration-300 leading-tight">{skill.name}</p>
                 </motion.div>
               ))}
             </motion.div>
@@ -610,7 +620,7 @@ export default function AboutPage() {
               </div>
               
               <p className="text-xl lg:text-2xl text-foreground/80 max-w-3xl mx-auto leading-relaxed font-medium">
-                Let&apos;s collaborate to bring your vision to life through exceptional photography and creative storytelling.
+                Have a project in mind? Let&apos;s discuss how we can work together.
               </p>
               
               <div className="flex flex-col sm:flex-row gap-6 justify-center pt-8">
@@ -620,7 +630,7 @@ export default function AboutPage() {
                   whileTap={{ scale: 0.95 }}
                   className="group bg-foreground text-background border border-foreground inline-flex items-center px-8 py-4 font-bold tracking-wide hover:bg-transparent hover:text-foreground transition-all duration-300 rounded-xl shadow-lg text-lg"
                 >
-                  START A PROJECT
+                  LET&apos;S TALK
                   <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform" />
                 </motion.a>
                 

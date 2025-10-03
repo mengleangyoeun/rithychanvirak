@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter, Livvic } from "next/font/google";
+import "@fontsource/kantumruy-pro/300.css";
+import "@fontsource/kantumruy-pro/400.css";
+import "@fontsource/kantumruy-pro/500.css";
+import "@fontsource/kantumruy-pro/600.css";
+import "@fontsource/kantumruy-pro/700.css";
 import "./globals.css";
 import { LayoutWrapper } from "@/components/layout-wrapper";
 

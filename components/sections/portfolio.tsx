@@ -29,15 +29,6 @@ export function Portfolio({ collections }: { collections: Collection[] }) {
             transition={{ duration: 0.8 }}
             viewport={{ once: true, margin: "-100px" }}
           >
-            <motion.span
-              className="inline-block px-3 py-1.5 sm:px-4 sm:py-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full text-white/80 text-xs sm:text-sm font-medium tracking-wide mb-4 sm:mb-6"
-              initial={{ opacity: 0, scale: 0.8 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.6 }}
-              viewport={{ once: true }}
-            >
-              Featured Collections
-            </motion.span>
             <h2
               className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-[0.08em] sm:tracking-[0.1em] uppercase mb-4 sm:mb-6 px-4"
               style={{ fontFamily: 'var(--font-livvic), sans-serif' }}
@@ -81,46 +72,39 @@ export function Portfolio({ collections }: { collections: Collection[] }) {
                     />
                   )}
 
-                  {/* Gradient overlays */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                  {/* Gradient Overlay - stronger on hover */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent group-hover:from-black/80 group-hover:via-black/30 transition-all duration-500"></div>
 
-                  {/* Content overlay */}
-                  <div className="absolute inset-0 p-4 sm:p-6 flex flex-col justify-end">
-                    <motion.div
-                      initial={{ y: 20, opacity: 0 }}
-                      whileInView={{ y: 0, opacity: 1 }}
-                      transition={{ duration: 0.5, delay: index * 0.1 + 0.2 }}
-                      viewport={{ once: true }}
+                  {/* Content - hidden by default, shown on hover */}
+                  <div className="absolute inset-0 p-4 sm:p-6 flex flex-col justify-end opacity-0 group-hover:opacity-100 transition-all duration-300">
+                    <h3
+                      className="text-xl sm:text-2xl font-bold text-white mb-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300"
+                      style={{ fontFamily: 'var(--font-livvic), sans-serif' }}
                     >
-                      <h3
-                        className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-2 sm:mb-3 tracking-wide leading-tight group-hover:translate-y-[-4px] transition-transform duration-300"
-                        style={{ fontFamily: 'var(--font-livvic), sans-serif' }}
-                      >
-                        {collection.title}
-                      </h3>
+                      {collection.title}
+                    </h3>
 
-                      {collection.description && (
-                        <p className="text-xs sm:text-sm text-white/80 font-medium max-w-xs leading-relaxed mb-3 sm:mb-4 line-clamp-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-100">
-                          {collection.description}
-                        </p>
-                      )}
+                    {collection.description && (
+                      <p className="text-xs sm:text-sm text-white/80 mb-3 sm:mb-4 line-clamp-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 delay-75">
+                        {collection.description}
+                      </p>
+                    )}
 
-                      <div className="flex items-center gap-2 sm:gap-3 text-white/90 text-xs font-semibold">
-                        <div className="flex items-center gap-1.5 sm:gap-2 bg-white/20 backdrop-blur-sm rounded-full px-2 sm:px-3 py-1 sm:py-1.5 border border-white/10">
-                          <span>📸</span>
-                          <span>{collection.totalPhotos}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 sm:gap-2 bg-white/20 backdrop-blur-sm rounded-full px-2 sm:px-3 py-1 sm:py-1.5 border border-white/10">
-                          <span>📁</span>
-                          <span>{collection.subAlbums}</span>
-                        </div>
+                    {/* Stats */}
+                    <div className="flex items-center gap-3 sm:gap-4 text-xs text-white/70 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 delay-100">
+                      <div className="flex items-center gap-1 sm:gap-1.5">
+                        <span>📸</span>
+                        <span>{collection.totalPhotos}</span>
                       </div>
-                    </motion.div>
+                      <div className="flex items-center gap-1 sm:gap-1.5">
+                        <span>📁</span>
+                        <span>{collection.subAlbums}</span>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Hover indicator */}
-                  <div className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center group-hover:rotate-45">
+                  {/* Arrow */}
+                  <div className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>

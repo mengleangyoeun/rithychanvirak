@@ -268,7 +268,7 @@ export default function VideosPage() {
               className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black text-white mb-6 tracking-tight leading-none"
               style={{ fontFamily: 'var(--font-livvic), sans-serif' }}
             >
-              ALL VIDEOS
+              VIDEOS
             </h1>
 
             <div className="flex items-center justify-center gap-4 mb-8">

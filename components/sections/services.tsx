@@ -23,15 +23,6 @@ export function Services({ services }: { services: Service[] }) {
           viewport={{ once: true, margin: "-100px" }}
           className="text-center mb-12 sm:mb-16 md:mb-20"
         >
-          <motion.span
-            className="inline-block px-3 py-1.5 sm:px-4 sm:py-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full text-white/80 text-xs sm:text-sm font-medium tracking-wide mb-4 sm:mb-6"
-            initial={{ opacity: 0, scale: 0.8 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true }}
-          >
-            What I Offer
-          </motion.span>
           <h2
             className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-[0.08em] sm:tracking-[0.1em] uppercase mb-4 sm:mb-6 px-4"
             style={{ fontFamily: 'var(--font-livvic), sans-serif' }}

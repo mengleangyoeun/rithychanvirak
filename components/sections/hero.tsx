@@ -2,7 +2,6 @@
 
 import { motion } from 'motion/react'
 import Image from 'next/image'
-import Link from 'next/link'
 import { urlFor } from '@/sanity/lib/image'
 import { ChevronDown } from 'lucide-react'
 
@@ -71,19 +70,8 @@ export function Hero({ data }: { data: HeroData | null }) {
 
       {/* Content */}
       <div className="relative z-10 text-center max-w-6xl mx-auto px-6 sm:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, delay: 0.2 }}
-          className="mb-4 sm:mb-6"
-        >
-          <span className="inline-block px-3 py-1.5 sm:px-4 sm:py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full text-white/90 text-xs sm:text-sm font-medium tracking-wide">
-            Professional Photographer
-          </span>
-        </motion.div>
-
         <motion.h1
-          className="text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-black text-white tracking-[0.1em] sm:tracking-[0.15em] leading-[1.1] mb-4 sm:mb-6 drop-shadow-2xl px-4"
+          className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-black text-white tracking-[0.1em] sm:tracking-[0.15em] leading-tight mb-4 sm:mb-6 drop-shadow-2xl px-4"
           style={{ fontFamily: 'var(--font-livvic), sans-serif' }}
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
@@ -109,31 +97,9 @@ export function Hero({ data }: { data: HeroData | null }) {
           {data?.subtitle || "Capturing moments that tell compelling stories through the lens"}
         </motion.p>
 
-        <motion.div
-          className="mt-2 sm:mt-12 flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center px-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 1.2 }}
-        >
-          <Link
-            href="/gallery"
-            className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-white text-black font-bold tracking-wide rounded-full hover:bg-white/90 transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-white/20 text-center text-sm sm:text-base"
-            style={{ fontFamily: 'var(--font-livvic), sans-serif' }}
-          >
-            View Gallery
-          </Link>
-          <Link
-            href="/contact"
-            className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-white/10 backdrop-blur-sm text-white font-bold tracking-wide rounded-full border-2 border-white/30 hover:bg-white/20 transition-all duration-300 hover:scale-105 text-center text-sm sm:text-base"
-            style={{ fontFamily: 'var(--font-livvic), sans-serif' }}
-          >
-            Get in Touch
-          </Link>
-        </motion.div>
-
         {/* Scroll Indicator */}
         <motion.div
-          className="mt-12 sm:mt-0 sm:absolute sm:bottom-12 sm:left-1/2 sm:transform sm:-translate-x-1/2 cursor-pointer group flex justify-center"
+          className="mt-16 sm:mt-20 cursor-pointer group flex justify-center"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.8, duration: 0.5 }}

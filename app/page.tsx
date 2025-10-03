@@ -43,9 +43,10 @@ async function getFeaturedCollections() {
       description,
       coverImage,
       "subAlbums": count(*[_type == "collection" && parentCollection._ref == ^._id]),
-      "subAlbumBreakdown": *[_type == "collection" && parentCollection._ref == ^._id]{
-        "photoCount": count(*[_type == "photo" && collection._ref == ^._id])
-      }
+      "totalPhotos": count(*[_type == "photo" && (
+        collection._ref == ^._id ||
+        collection->parentCollection._ref == ^._id
+      )])
     }
   `)
 }
@@ -86,10 +87,8 @@ export default async function HomePage() {
     getFeaturedServices().catch(() => [])
   ])
 
-  const collectionsWithTotals = collectionsData?.map((collection: { subAlbumBreakdown?: { photoCount: number }[] }) => ({
-    ...collection,
-    totalPhotos: collection.subAlbumBreakdown?.reduce((sum: number, subAlbum: { photoCount: number }) => sum + subAlbum.photoCount, 0) || 0
-  })) || []
+  // Collections already have totalPhotos from Sanity query
+  const collectionsWithTotals = collectionsData || []
 
   return (
     <>
