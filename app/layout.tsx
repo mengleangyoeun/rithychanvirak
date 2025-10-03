@@ -6,22 +6,30 @@ import { LayoutWrapper } from "@/components/layout-wrapper";
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
+  display: 'swap', // Optimize font loading
+  preload: true,
 });
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: 'swap',
+  preload: true,
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: 'swap',
+  preload: false, // Only preload critical fonts
 });
 
 const livvic = Livvic({
   weight: ['300', '400', '500', '600', '700', '900'],
   subsets: ["latin"],
   variable: "--font-livvic",
+  display: 'swap',
+  preload: true, // Critical for headings
 });
 
 export const metadata: Metadata = {
@@ -47,7 +55,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark scroll-smooth">
+      <head>
+        {/* Preconnect to external domains */}
+        <link rel="preconnect" href="https://cdn.sanity.io" />
+        <link rel="dns-prefetch" href="https://cdn.sanity.io" />
+        <link rel="preconnect" href="https://res.cloudinary.com" />
+        <link rel="dns-prefetch" href="https://res.cloudinary.com" />
+      </head>
       <body
         className={`${inter.variable} ${geistSans.variable} ${geistMono.variable} ${livvic.variable} antialiased min-h-screen flex flex-col`}
       >

@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { motion } from "motion/react"
 import { Mail, Phone, Camera, Heart } from "lucide-react"
-import { siInstagram, siTelegram, siWhatsapp, siLintcode } from 'simple-icons'
+import { siInstagram, siTelegram, siFacebook, siGmail, siLintcode } from 'simple-icons'
 import type { SimpleIcon } from 'simple-icons'
 import type { LucideIcon } from 'lucide-react'
 
@@ -16,29 +16,35 @@ export function Footer() {
   const currentYear = new Date().getFullYear()
 
   const socialLinks: SocialLink[] = [
-    { 
-      href: "https://instagram.com/rithychanvirak", 
-      icon: siInstagram, 
-      label: "Instagram",
-      color: "hover:text-pink-400"
+    {
+      href: "tel:+85511899757",
+      icon: Phone,
+      label: "Contact",
+      color: "hover:text-green-400"
     },
-    { 
-      href: "https://t.me/rithychanvirak", 
-      icon: siTelegram, 
+    {
+      href: "https://t.me/rithychanvirak",
+      icon: siTelegram,
       label: "Telegram",
       color: "hover:text-blue-400"
     },
-    { 
-      href: "https://wa.me/85511899757", 
-      icon: siWhatsapp, 
-      label: "WhatsApp",
-      color: "hover:text-green-400"
-    },
-    { 
-      href: "mailto:hello@rithychanvirak.com", 
-      icon: Mail, 
-      label: "Email",
+    {
+      href: "https://facebook.com/rithychanvirak",
+      icon: siFacebook,
+      label: "Facebook",
       color: "hover:text-blue-500"
+    },
+    {
+      href: "https://instagram.com/rithychanvirak",
+      icon: siInstagram,
+      label: "Instagram",
+      color: "hover:text-pink-400"
+    },
+    {
+      href: "mailto:hello@rithychanvirak.com",
+      icon: siGmail,
+      label: "Gmail",
+      color: "hover:text-red-400"
     },
   ]
 

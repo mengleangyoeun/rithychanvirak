@@ -126,23 +126,44 @@ export const photo = defineType({
     select: {
       title: 'title',
       imageUrl: 'imageUrl',
-      collectionTitle: 'collection.title'
+      collectionTitle: 'collection.title',
+      featured: 'featured',
+      order: 'order'
     },
-    prepare({ title, imageUrl, collectionTitle }) {
+    prepare({ title, collectionTitle, featured, order }) {
+      const parts = []
+
+      // Collection
+      if (collectionTitle) {
+        parts.push(`📁 ${collectionTitle}`)
+      } else {
+        parts.push('⚠️ No collection')
+      }
+
+      // Featured badge
+      if (featured) {
+        parts.push('⭐ Featured')
+      }
+
+      // Order number
+      if (order !== undefined) {
+        parts.push(`#${order}`)
+      }
+
       return {
         title: title,
-        subtitle: collectionTitle ? `In ${collectionTitle}` : 'No collection assigned'
+        subtitle: parts.join(' • ')
       }
     }
   },
   orderings: [
     {
-      title: 'Order (Ascending)',
+      title: '🎯 By Display Order',
       name: 'orderAsc',
       by: [{ field: 'order', direction: 'asc' }]
     },
     {
-      title: 'Collection then Order',
+      title: '📁 By Collection',
       name: 'collectionOrder',
       by: [
         { field: 'collection', direction: 'asc' },
@@ -150,9 +171,32 @@ export const photo = defineType({
       ]
     },
     {
-      title: 'Capture Date (Newest First)',
+      title: '⭐ Featured First',
+      name: 'featuredFirst',
+      by: [
+        { field: 'featured', direction: 'desc' },
+        { field: '_createdAt', direction: 'desc' }
+      ]
+    },
+    {
+      title: '📅 Newest First',
+      name: 'newestFirst',
+      by: [{ field: '_createdAt', direction: 'desc' }]
+    },
+    {
+      title: '📅 Oldest First',
+      name: 'oldestFirst',
+      by: [{ field: '_createdAt', direction: 'asc' }]
+    },
+    {
+      title: '📸 By Capture Date',
       name: 'captureDateDesc',
       by: [{ field: 'captureDate', direction: 'desc' }]
+    },
+    {
+      title: 'A-Z Alphabetical',
+      name: 'alphabetical',
+      by: [{ field: 'title', direction: 'asc' }]
     }
   ]
 })

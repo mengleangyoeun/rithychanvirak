@@ -1,8 +1,12 @@
 "use client"
 
 import { usePathname } from "next/navigation"
-import { Header } from "@/components/navigation"
+import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import { PrefetchRoutes } from "@/components/prefetch-routes"
+import { ErrorBoundary } from "@/components/error-boundary"
+import { ScrollToTop } from "@/components/scroll-to-top"
+import { useScrollRestoration } from "@/hooks/use-scroll-restoration"
 
 export function LayoutWrapper({
   children,
@@ -12,15 +16,22 @@ export function LayoutWrapper({
   const pathname = usePathname()
   const isStudioRoute = pathname?.startsWith('/studio')
 
+  // Enable scroll restoration
+  useScrollRestoration()
+
   if (isStudioRoute) {
     return <>{children}</>
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <main className="flex-1">{children}</main>
-      <Footer />
-    </div>
+    <ErrorBoundary>
+      <div className="min-h-screen flex flex-col">
+        <PrefetchRoutes />
+        <Header />
+        <div className="flex-1">{children}</div>
+        <Footer />
+        <ScrollToTop />
+      </div>
+    </ErrorBoundary>
   )
 }

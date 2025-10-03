@@ -2,12 +2,10 @@
 
 import { useState, useEffect, use } from 'react'
 import { client } from '@/sanity/lib/client'
-import { urlFor } from '@/sanity/lib/image'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { motion } from 'motion/react'
-import { ArrowLeft, Camera, Calendar, ArrowRight, Eye } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Eye } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FullscreenPhotoPreview } from '@/components/fullscreen-photo-preview'
@@ -134,12 +132,6 @@ export default function PhotoPage({ params }: PhotoPageProps) {
 
     fetchPhoto()
   }, [resolvedParams.slug])
-
-  const fadeInUp = {
-    initial: { opacity: 0, y: 60 },
-    animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.8 }
-  }
 
   if (loading) {
     return (

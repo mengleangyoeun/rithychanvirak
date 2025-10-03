@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:capture.framer.photos)",
-      "Bash(pnpm lint:*)"
+      "Bash(pnpm lint:*)",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "ask": []

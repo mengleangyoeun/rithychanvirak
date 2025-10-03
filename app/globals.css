@@ -121,9 +121,32 @@
   body {
     @apply bg-black text-foreground font-sans;
   }
-  html, body {
+  html {
     height: 100%;
     overflow-x: hidden;
+    overflow-y: auto;
+    /* Enable hardware acceleration */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    height: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Performance optimizations */
+  img, video, iframe {
+    content-visibility: auto;
+  }
+
+  /* Reduce motion for users who prefer it */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 

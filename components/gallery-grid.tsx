@@ -67,7 +67,7 @@ export function GalleryGrid({
         animate="animate"
         className={getGridClass()}
       >
-        {photos.map((photo, index) => (
+        {photos.map((photo) => (
           <motion.div
             key={photo._id}
             variants={{
@@ -90,6 +90,9 @@ export function GalleryGrid({
                   height={0}
                   style={{ height: 'auto' }}
                   className="w-full h-auto object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+                  placeholder="blur"
+                  blurDataURL="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='500' height='300'%3E%3Cfilter id='b' color-interpolation-filters='sRGB'%3E%3CfeGaussianBlur stdDeviation='20'/%3E%3C/filter%3E%3Crect width='500' height='300' fill='%23111827' filter='url(%23b)'/%3E%3C/svg%3E"
+                  loading="lazy"
                 />
                 
                 {/* Enhanced Gradient Overlay */}
@@ -159,7 +162,7 @@ export function GalleryGrid({
       animate="animate"
       className={getGridClass()}
     >
-      {photos.map((photo, index) => (
+      {photos.map((photo) => (
         <motion.div
           key={photo._id}
           variants={photoVariants}
@@ -179,6 +182,9 @@ export function GalleryGrid({
                 width={400}
                 height={300}
                 className="w-full h-auto object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+                placeholder="blur"
+                blurDataURL="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Cfilter id='b' color-interpolation-filters='sRGB'%3E%3CfeGaussianBlur stdDeviation='20'/%3E%3C/filter%3E%3Crect width='400' height='300' fill='%23111827' filter='url(%23b)'/%3E%3C/svg%3E"
+                loading="lazy"
               />
               
               {/* Enhanced Gradient Overlay */}

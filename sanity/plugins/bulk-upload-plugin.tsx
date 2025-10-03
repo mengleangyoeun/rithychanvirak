@@ -56,6 +56,7 @@ export const bulkUploadPlugin = definePlugin({
 
 import React, { useState } from 'react'
 import { useClient } from 'sanity'
+import imageCompression from 'browser-image-compression'
 
 function BulkUploadComponent() {
   const client = useClient({ apiVersion: '2024-01-01' })
@@ -68,6 +69,7 @@ function BulkUploadComponent() {
   const [totalFiles, setTotalFiles] = useState(0)
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
   const [dragOver, setDragOver] = useState(false)
+  const [compressionSavings, setCompressionSavings] = useState({ original: 0, compressed: 0 })
 
   // Fetch collections on component mount
   React.useEffect(() => {
@@ -77,13 +79,42 @@ function BulkUploadComponent() {
       .catch(console.error)
   }, [client])
 
+  // Compress image before upload
+  const compressImage = async (file: File): Promise<File> => {
+    const options = {
+      maxSizeMB: 1, // Max file size in MB
+      maxWidthOrHeight: 2048, // Max width or height (good for web)
+      useWebWorker: true,
+      fileType: 'image/jpeg', // Convert to JPEG for better compression
+      initialQuality: 0.85 // 85% quality - great balance
+    }
+
+    try {
+      const compressedFile = await imageCompression(file, options)
+
+      // Update compression stats
+      setCompressionSavings(prev => ({
+        original: prev.original + file.size,
+        compressed: prev.compressed + compressedFile.size
+      }))
+
+      return compressedFile
+    } catch (error) {
+      console.error('Compression error:', error)
+      return file // Return original if compression fails
+    }
+  }
+
   // Cloudinary upload function
   const uploadToCloudinary = async (file: File): Promise<{ secure_url: string; public_id: string; width: number; height: number }> => {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'your_preset')
     formData.append('folder', 'photography-portfolio')
-    
+    // Add Cloudinary transformations for additional compression
+    formData.append('quality', 'auto:good') // Auto-optimize quality
+    formData.append('fetch_format', 'auto') // Auto-select best format (WebP, AVIF, etc.)
+
     const response = await fetch(
       `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
       {
@@ -91,11 +122,11 @@ function BulkUploadComponent() {
         body: formData
       }
     )
-    
+
     if (!response.ok) {
       throw new Error(`Cloudinary upload failed: ${response.statusText}`)
     }
-    
+
     return response.json()
   }
 
@@ -107,22 +138,26 @@ function BulkUploadComponent() {
     setTotalFiles(files.length)
     setUploadedCount(0)
     setUploadedFiles([])
+    setCompressionSavings({ original: 0, compressed: 0 })
 
     try {
       const filesArray = Array.from(files)
-      
+
       // Process files in batches of 3 for better performance
       const batchSize = 3
       for (let i = 0; i < filesArray.length; i += batchSize) {
         const batch = filesArray.slice(i, i + batchSize)
-        
+
         const batchPromises = batch.map(async (file, batchIndex) => {
           const globalIndex = i + batchIndex
           setCurrentFile(file.name)
-          setProgress(`📸 Uploading ${globalIndex + 1}/${filesArray.length}`)
+          setProgress(`🗜️ Compressing & uploading ${globalIndex + 1}/${filesArray.length}`)
 
-          // Upload to Cloudinary instead of Sanity
-          const cloudinaryResult = await uploadToCloudinary(file)
+          // Compress image before uploading
+          const compressedFile = await compressImage(file)
+
+          // Upload compressed file to Cloudinary
+          const cloudinaryResult = await uploadToCloudinary(compressedFile)
 
           // Create photo document with Cloudinary URLs
           const photoTitle = file.name.replace(/\.[^/.]+$/, '')
@@ -372,9 +407,26 @@ function BulkUploadComponent() {
         }}>
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎉</div>
           <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Upload Complete!</h3>
-          <p style={{ opacity: 0.9 }}>
+          <p style={{ opacity: 0.9, marginBottom: '1rem' }}>
             Successfully uploaded {uploadedFiles.length} photos to your collection
           </p>
+          {compressionSavings.original > 0 && (
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.2)',
+              borderRadius: '12px',
+              padding: '1rem',
+              fontSize: '0.95rem'
+            }}>
+              <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>💾 Storage Saved</div>
+              <div style={{ opacity: 0.95 }}>
+                Original: {(compressionSavings.original / 1024 / 1024).toFixed(2)} MB
+                <br />
+                Compressed: {(compressionSavings.compressed / 1024 / 1024).toFixed(2)} MB
+                <br />
+                <strong>Saved: {((1 - compressionSavings.compressed / compressionSavings.original) * 100).toFixed(0)}% ({((compressionSavings.original - compressionSavings.compressed) / 1024 / 1024).toFixed(2)} MB)</strong>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -447,7 +499,7 @@ function BulkUploadComponent() {
           <li>Your photos will automatically appear in the selected collection</li>
         </ol>
         
-        <div style={{ 
+        <div style={{
           marginTop: '1rem',
           padding: '0.75rem',
           background: 'rgba(3, 105, 161, 0.1)',
@@ -455,7 +507,7 @@ function BulkUploadComponent() {
           fontSize: '0.9rem',
           color: '#075985'
         }}>
-          <strong>💪 Pro Tips:</strong> You can upload hundreds of photos at once! The system will process them sequentially and show real-time progress.
+          <strong>💪 Pro Tips:</strong> Images are automatically compressed before upload (max 1MB, 2048px, 85% quality). You can upload hundreds of photos at once!
         </div>
       </div>
     </div>

@@ -14,6 +14,7 @@ import {schema} from './sanity/schemaTypes'
 import {structure} from './sanity/structure'
 import {bulkUploadPlugin} from './sanity/plugins/bulk-upload-plugin'
 import {AutoCreateSubalbumsAction} from './sanity/actions/auto-create-subalbums-action'
+import {SafeDeleteAction} from './sanity/actions/safe-delete-action'
 
 export default defineConfig({
   basePath: '/studio',
@@ -31,10 +32,16 @@ export default defineConfig({
   ],
   document: {
     actions: (prev, context) => {
+      // Replace default delete with safe delete
+      const filteredActions = prev.filter(action => action.action !== 'delete')
+
       if (context.schemaType === 'collection') {
-        return [...prev, AutoCreateSubalbumsAction]
+        return [...filteredActions, AutoCreateSubalbumsAction, SafeDeleteAction]
       }
-      return prev
+      if (context.schemaType === 'photo') {
+        return [...filteredActions, SafeDeleteAction]
+      }
+      return [...filteredActions, SafeDeleteAction]
     }
   }
 })

@@ -111,31 +111,78 @@ export const collection = defineType({
   preview: {
     select: {
       title: 'title',
-      subtitle: 'collectionType',
+      collectionType: 'collectionType',
       media: 'coverImage',
-      parentTitle: 'parentCollection.title'
+      parentTitle: 'parentCollection.title',
+      status: 'status',
+      order: 'order'
     },
-    prepare({ title, subtitle, media, parentTitle }) {
+    prepare({ title, collectionType, media, parentTitle, status, order }) {
+      // Build a clear subtitle with all info
+      const parts = []
+
+      // Collection type
+      if (collectionType === 'sub') {
+        parts.push(`📁 Sub-album${parentTitle ? ` of ${parentTitle}` : ''}`)
+      } else {
+        parts.push('📂 Main Collection')
+      }
+
+      // Status badge
+      if (status === 'published') {
+        parts.push('✅ Published')
+      } else if (status === 'draft') {
+        parts.push('📝 Draft')
+      } else if (status === 'archived') {
+        parts.push('📦 Archived')
+      }
+
+      // Order number
+      if (order !== undefined) {
+        parts.push(`#${order}`)
+      }
+
       return {
         title: title,
-        subtitle: subtitle === 'sub' ? `Sub-album of ${parentTitle || 'Unknown'}` : 'Main Collection',
+        subtitle: parts.join(' • '),
         media: media
       }
     }
   },
   orderings: [
     {
-      title: 'Order (Ascending)',
+      title: '🎯 By Display Order',
       name: 'orderAsc',
       by: [{ field: 'order', direction: 'asc' }]
     },
     {
-      title: 'Type then Order',
+      title: '📂 Main Collections First',
       name: 'typeOrder',
       by: [
         { field: 'collectionType', direction: 'asc' },
         { field: 'order', direction: 'asc' }
       ]
+    },
+    {
+      title: '✅ Published First',
+      name: 'statusPublished',
+      by: [
+        { field: 'status', direction: 'desc' },
+        { field: 'order', direction: 'asc' }
+      ]
+    },
+    {
+      title: '📝 Drafts First',
+      name: 'statusDraft',
+      by: [
+        { field: 'status', direction: 'asc' },
+        { field: 'order', direction: 'asc' }
+      ]
+    },
+    {
+      title: 'A-Z Alphabetical',
+      name: 'alphabetical',
+      by: [{ field: 'title', direction: 'asc' }]
     }
   ]
 })

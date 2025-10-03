@@ -25,33 +25,35 @@ export const contact = defineType({
         {
           type: 'object',
           fields: [
-            { 
-              name: 'platform', 
-              type: 'string', 
+            {
+              name: 'platform',
+              type: 'string',
               title: 'Platform',
               options: {
                 list: [
+                  { title: 'Contact', value: 'contact' },
                   { title: 'Telegram', value: 'telegram' },
                   { title: 'Facebook', value: 'facebook' },
                   { title: 'Instagram', value: 'instagram' },
-                  { title: 'Phone', value: 'phone' }
+                  { title: 'Gmail', value: 'gmail' }
                 ]
               }
             },
-            { name: 'url', type: 'url', title: 'URL' },
-            { 
-              name: 'icon', 
-              type: 'string', 
+            { name: 'url', type: 'string', title: 'URL' },
+            {
+              name: 'icon',
+              type: 'string',
               title: 'Icon Component',
               options: {
                 list: [
-                  { title: 'Telegram (MessageCircle)', value: 'MessageCircle' },
+                  { title: 'Contact (Phone)', value: 'Contact' },
+                  { title: 'Telegram', value: 'Telegram' },
                   { title: 'Facebook', value: 'Facebook' },
                   { title: 'Instagram', value: 'Instagram' },
-                  { title: 'Phone', value: 'Phone' }
+                  { title: 'Gmail', value: 'Gmail' }
                 ]
               },
-              description: 'Lucide React icon component name'
+              description: 'Icon component name'
             }
           ],
           preview: {
@@ -62,7 +64,7 @@ export const contact = defineType({
           }
         }
       ],
-      validation: Rule => Rule.max(4).error('Maximum 4 social links allowed')
+      validation: Rule => Rule.max(5).error('Maximum 5 social links allowed')
     })
   ],
   preview: {

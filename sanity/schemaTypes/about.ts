@@ -65,10 +65,38 @@ export const about = defineType({
       name: 'skills',
       title: 'Skills',
       type: 'array',
-      of: [{ type: 'string' }],
-      options: {
-        layout: 'tags'
-      }
+      of: [
+        {
+          type: 'object',
+          fields: [
+            {
+              name: 'name',
+              type: 'string',
+              title: 'Skill Name',
+              validation: Rule => Rule.required()
+            },
+            {
+              name: 'icon',
+              type: 'string',
+              title: 'Icon/Emoji',
+              description: 'Add an emoji (📸, 🎥, 🚁) or leave empty for default',
+              placeholder: '📸'
+            }
+          ],
+          preview: {
+            select: {
+              title: 'name',
+              icon: 'icon'
+            },
+            prepare({ title, icon }) {
+              return {
+                title: title,
+                subtitle: icon ? `${icon} Icon` : 'No icon'
+              }
+            }
+          }
+        }
+      ]
     }),
     defineField({
       name: 'awards',
