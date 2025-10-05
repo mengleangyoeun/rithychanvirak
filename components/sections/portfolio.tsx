@@ -4,6 +4,7 @@ import { motion } from 'motion/react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { urlFor } from '@/sanity/lib/image'
+import { CollectionCardSkeletonPortfolio } from '@/components/collection-card-skeleton'
 
 interface Collection {
   _id: string
@@ -15,8 +16,8 @@ interface Collection {
   subAlbums: number
 }
 
-export function Portfolio({ collections }: { collections: Collection[] }) {
-  if (!collections || collections.length === 0) return null
+export function Portfolio({ collections, loading = false }: { collections: Collection[], loading?: boolean }) {
+  if (!loading && (!collections || collections.length === 0)) return null
 
   return (
     <section className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6 overflow-hidden">
@@ -50,7 +51,21 @@ export function Portfolio({ collections }: { collections: Collection[] }) {
 
         {/* Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10 max-w-6xl mx-auto">
-          {collections.map((collection, index) => (
+          {loading ? (
+            // Show 3 skeleton cards while loading
+            Array.from({ length: 3 }).map((_, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 50 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: index * 0.1 }}
+                viewport={{ once: true, margin: "-50px" }}
+              >
+                <CollectionCardSkeletonPortfolio />
+              </motion.div>
+            ))
+          ) : (
+            collections.map((collection, index) => (
             <motion.div
               key={collection._id}
               initial={{ opacity: 0, y: 50 }}
@@ -72,26 +87,26 @@ export function Portfolio({ collections }: { collections: Collection[] }) {
                     />
                   )}
 
-                  {/* Gradient Overlay - stronger on hover */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent group-hover:from-black/80 group-hover:via-black/30 transition-all duration-500"></div>
+                  {/* Gradient Overlay - always visible, stronger on hover */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent md:from-black/40 md:via-black/10 md:group-hover:from-black/80 md:group-hover:via-black/30 transition-all duration-500"></div>
 
-                  {/* Content - hidden by default, shown on hover */}
-                  <div className="absolute inset-0 p-4 sm:p-6 flex flex-col justify-end opacity-0 group-hover:opacity-100 transition-all duration-300">
+                  {/* Content - always visible on mobile, shown on hover on desktop */}
+                  <div className="absolute inset-0 p-4 sm:p-6 flex flex-col justify-end md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
                     <h3
-                      className="text-xl sm:text-2xl font-bold text-white mb-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300"
+                      className="text-xl sm:text-2xl font-bold text-white mb-2 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300"
                       style={{ fontFamily: 'var(--font-livvic), sans-serif' }}
                     >
                       {collection.title}
                     </h3>
 
                     {collection.description && (
-                      <p className="text-xs sm:text-sm text-white/80 mb-3 sm:mb-4 line-clamp-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 delay-75">
+                      <p className="text-xs sm:text-sm text-white/80 mb-3 sm:mb-4 line-clamp-2 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300 md:delay-75">
                         {collection.description}
                       </p>
                     )}
 
                     {/* Stats */}
-                    <div className="flex items-center gap-3 sm:gap-4 text-xs text-white/70 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 delay-100">
+                    <div className="flex items-center gap-3 sm:gap-4 text-xs text-white/70 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300 md:delay-100">
                       <div className="flex items-center gap-1 sm:gap-1.5">
                         <span>📸</span>
                         <span>{collection.totalPhotos}</span>
@@ -112,7 +127,8 @@ export function Portfolio({ collections }: { collections: Collection[] }) {
                 </div>
               </Link>
             </motion.div>
-          ))}
+          ))
+          )}
         </div>
       </div>
     </section>

@@ -71,19 +71,43 @@ async function getPhotoBySlug(slug: string) {
 
 async function getRelatedPhotos(collections: Array<{ slug: { current: string } }>, currentPhotoId: string) {
   if (!collections || collections.length === 0) return []
-  
+
   const collectionSlugs = collections.map(c => c.slug.current)
-  
-  return client.fetch(`
-    *[_type == "photo" && _id != $currentPhotoId && collection->slug.current in $collectionSlugs] | order(_createdAt desc) [0...6] {
+
+  // Get all photos from the same collection
+  const allPhotos = await client.fetch<Photo[]>(`
+    *[_type == "photo" && collection->slug.current in $collectionSlugs] | order(title asc) {
       _id,
       title,
       slug,
       imageUrl,
       imageId,
-      alt
+      imageWidth,
+      imageHeight,
+      alt,
+      collection->{ title, slug }
     }
-  `, { currentPhotoId, collectionSlugs })
+  `, { collectionSlugs })
+
+  // Natural sort by extracting numbers from titles like "Rak_ (1)", "Rak_ (2)", etc.
+  const sortedPhotos = allPhotos.sort((a, b) => {
+    const numA = parseInt(a.title.match(/\d+/)?.[0] || '0')
+    const numB = parseInt(b.title.match(/\d+/)?.[0] || '0')
+    return numA - numB
+  })
+
+  // Find current photo index
+  const currentIndex = sortedPhotos.findIndex((p) => p._id === currentPhotoId)
+
+  // Get 4 photos before and 4 after current photo (excluding current)
+  const relatedPhotos = []
+  for (let i = Math.max(0, currentIndex - 4); i < Math.min(sortedPhotos.length, currentIndex + 5); i++) {
+    if (sortedPhotos[i]._id !== currentPhotoId) {
+      relatedPhotos.push(sortedPhotos[i])
+    }
+  }
+
+  return relatedPhotos.slice(0, 8)
 }
 
 export default function PhotoPage({ params }: PhotoPageProps) {
@@ -92,7 +116,6 @@ export default function PhotoPage({ params }: PhotoPageProps) {
   const [relatedPhotos, setRelatedPhotos] = useState<Photo[]>([])
   const [loading, setLoading] = useState(true)
   const [fullscreenOpen, setFullscreenOpen] = useState(false)
-  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
   const router = useRouter()
 
   useEffect(() => {
@@ -151,18 +174,18 @@ export default function PhotoPage({ params }: PhotoPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen unified-background">
       
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 py-8 pt-24">
         
-        {/* Back to Gallery */}
-        <Link 
-          href="/gallery"
-          className="inline-flex items-center px-4 py-2 bg-secondary text-foreground hover:bg-foreground hover:text-background transition-colors mb-6 font-medium rounded-md border border-border"
+        {/* Back to Collection */}
+        <Link
+          href={`/collection/${photo.collection.slug.current}`}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 text-white hover:bg-white/20 transition-all duration-300 mb-8 font-medium rounded-lg backdrop-blur-sm border border-white/10"
         >
-          <ArrowLeft className="w-5 h-5 mr-2" />
-          Back to Gallery
+          <ArrowLeft className="w-4 h-4" />
+          Back to Collection
         </Link>
         
         {/* Title */}
@@ -170,27 +193,29 @@ export default function PhotoPage({ params }: PhotoPageProps) {
           {photo.title}
         </h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+
           {/* Photo */}
-          <div
-            className="relative cursor-pointer group max-w-sm mx-auto"
-            onClick={() => setFullscreenOpen(true)}
-          >
-            <Image
-              src={getOptimizedImageUrl(photo.imageId, 1280)}
-              alt={photo.alt || photo.title}
-              width={1280}
-              height={0}
-              style={{ height: 'auto' }}
-              className="w-full rounded-lg border border-border"
-              priority
-            />
-            
-            {/* Hover overlay */}
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
-              <div className="bg-white/90 rounded-full p-3">
-                <Eye className="w-6 h-6 text-gray-800" />
+          <div className={`md:col-span-1 flex items-start ${(photo.imageWidth && photo.imageHeight && photo.imageWidth < photo.imageHeight) ? 'justify-center' : 'justify-start'}`}>
+            <div
+              className={`relative cursor-pointer group rounded-2xl overflow-hidden bg-white/5 backdrop-blur-sm border border-white/10 w-full ${(photo.imageWidth && photo.imageHeight && photo.imageWidth < photo.imageHeight) ? 'max-w-sm' : 'max-w-full'}`}
+              onClick={() => setFullscreenOpen(true)}
+            >
+              <Image
+                src={getOptimizedImageUrl(photo.imageId, 1280)}
+                alt={photo.alt || photo.title}
+                width={photo.imageWidth || 1280}
+                height={photo.imageHeight || 853}
+                style={{ width: '100%', height: 'auto' }}
+                className="w-full h-auto"
+                priority
+              />
+
+              {/* Hover overlay */}
+              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <div className="bg-white/20 backdrop-blur-md rounded-full p-4">
+                  <Eye className="w-8 h-8 text-white" />
+                </div>
               </div>
             </div>
           </div>
@@ -316,8 +341,8 @@ export default function PhotoPage({ params }: PhotoPageProps) {
           photos={relatedPhotos}
           collectionSlug={photo.collection.slug.current}
           onPhotoSelect={(index) => {
-            setCurrentPhotoIndex(index)
-            setFullscreenOpen(true)
+            // Navigate to the selected photo's detail page
+            router.push(`/photo/${relatedPhotos[index].slug.current}`)
           }}
         />
       )}
@@ -340,7 +365,7 @@ export default function PhotoPage({ params }: PhotoPageProps) {
           }}
           isOpen={fullscreenOpen}
           onClose={() => setFullscreenOpen(false)}
-          relatedPhotos={relatedPhotos.filter(p => p.imageUrl).map(p => ({
+          relatedPhotos={relatedPhotos.filter(p => p.imageUrl && p.imageId).map(p => ({
             _id: p._id,
             title: p.title,
             imageUrl: p.imageUrl,
@@ -348,11 +373,12 @@ export default function PhotoPage({ params }: PhotoPageProps) {
             alt: p.alt,
             slug: p.slug
           }))}
-          currentIndex={currentPhotoIndex}
+          currentIndex={0}
           onNavigate={(direction) => {
+            const currentIdx = relatedPhotos.findIndex(p => p._id === photo._id)
             const nextIndex = direction === 'next'
-              ? (currentPhotoIndex + 1) % relatedPhotos.length
-              : currentPhotoIndex === 0 ? relatedPhotos.length - 1 : currentPhotoIndex - 1
+              ? (currentIdx + 1) % relatedPhotos.length
+              : currentIdx === 0 ? relatedPhotos.length - 1 : currentIdx - 1
             router.push(`/photo/${relatedPhotos[nextIndex].slug.current}`)
           }}
         />

@@ -156,14 +156,15 @@
 }
 
 .nav-scrolled {
-  background: linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(20, 20, 20, 0.9) 100%);
-  backdrop-filter: blur(25px) saturate(200%) brightness(1.1);
-  -webkit-backdrop-filter: blur(25px) saturate(200%) brightness(1.1);
-  box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.85) 0%, rgba(20, 20, 20, 0.95) 100%);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  border-bottom-color: rgba(255, 255, 255, 0.2);
+  transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              backdrop-filter 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              border-bottom-color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Minimal Components */

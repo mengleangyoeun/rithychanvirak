@@ -212,14 +212,73 @@ export function FullscreenPhotoPreview({
   const handleShare = async (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    
-    if (navigator.share) {
-      await navigator.share({
-        title: photo.title,
-        url: window.location.href
-      })
-    } else {
-      await navigator.clipboard.writeText(window.location.href)
+
+    const photoUrl = `${window.location.origin}/photo/${photo.slug.current}`
+
+    try {
+      // MOBILE & MODERN BROWSERS: Use native share
+      if (navigator.share) {
+        console.log('Opening native share dialog...')
+
+        // Check if browser supports sharing files
+        const canShareFiles = navigator.canShare && navigator.canShare({ files: [] })
+
+        if (canShareFiles) {
+          // Try to share with image
+          try {
+            const imageUrl = getOptimizedImageUrl(photo.imageId, 1920)
+            const response = await fetch(imageUrl)
+            const blob = await response.blob()
+            const file = new File([blob], `${photo.title}.jpg`, { type: 'image/jpeg' })
+
+            // Check if we can share this specific file
+            if (navigator.canShare({ files: [file] })) {
+              console.log('Sharing with image file...')
+              await navigator.share({
+                title: photo.title,
+                text: `Check out this photo: ${photo.title}`,
+                url: photoUrl,
+                files: [file]
+              })
+              console.log('Share successful!')
+              return
+            }
+          } catch (fileError) {
+            console.log('Sharing with file failed, falling back to URL only:', fileError)
+          }
+        }
+
+        // Share without image (URL only) - this opens WhatsApp, Email, etc.
+        console.log('Sharing URL only...')
+        await navigator.share({
+          title: photo.title,
+          text: `Check out this photo: ${photo.title}`,
+          url: photoUrl
+        })
+        console.log('Share successful!')
+      } else {
+        // DESKTOP FALLBACK: Copy to clipboard (no native share on most desktop browsers)
+        console.log('Native share not available, copying to clipboard...')
+        await navigator.clipboard.writeText(photoUrl)
+        alert('📋 Photo link copied to clipboard!\n\nYou can now paste it to share.')
+      }
+    } catch (error) {
+      // User cancelled or share failed
+      if (error instanceof Error && error.name === 'AbortError') {
+        // User cancelled - do nothing
+        return
+      }
+
+      console.error('Share failed:', error)
+
+      // Final fallback: copy to clipboard
+      try {
+        await navigator.clipboard.writeText(photoUrl)
+        alert('Photo link copied to clipboard!')
+      } catch (clipboardError) {
+        console.error('Clipboard copy failed:', clipboardError)
+        alert('Could not share or copy link. Please try again.')
+      }
     }
   }
 
@@ -252,39 +311,43 @@ export function FullscreenPhotoPreview({
             )}
           </div>
           
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 sm:gap-2">
             <Link
               href={`/photo/${photo.slug.current}`}
-              className="text-white hover:bg-white/20 rounded-full p-2 h-10 w-10 flex items-center justify-center transition-colors"
+              className="text-white hover:bg-white/20 rounded-full p-2 h-9 w-9 sm:h-10 sm:w-10 flex items-center justify-center transition-colors"
+              aria-label="View photo details"
             >
-              <Info className="h-5 w-5" />
+              <Info className="h-4 w-4 sm:h-5 sm:w-5" />
             </Link>
 
             <Button
               variant="ghost"
               size="sm"
               onClick={handleDownload}
-              className="text-white hover:bg-white/20 rounded-full p-2 h-10 w-10"
+              className="text-white hover:bg-white/20 rounded-full p-2 h-9 w-9 sm:h-10 sm:w-10"
+              aria-label="Download photo"
             >
-              <Download className="h-5 w-5" />
+              <Download className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
 
             <Button
               variant="ghost"
               size="sm"
               onClick={handleShare}
-              className="text-white hover:bg-white/20 rounded-full p-2 h-10 w-10"
+              className="text-white hover:bg-white/20 rounded-full p-2 h-9 w-9 sm:h-10 sm:w-10"
+              aria-label="Share photo"
             >
-              <Share2 className="h-5 w-5" />
+              <Share2 className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
 
             <Button
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="text-white hover:bg-white/20 rounded-full p-2 h-10 w-10"
+              className="text-white hover:bg-white/20 rounded-full p-2 h-9 w-9 sm:h-10 sm:w-10"
+              aria-label="Close preview"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
           </div>
         </motion.div>

@@ -67,6 +67,8 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="https://cdn.sanity.io" />
         <link rel="preconnect" href="https://res.cloudinary.com" />
         <link rel="dns-prefetch" href="https://res.cloudinary.com" />
+        {/* Web App Manifest */}
+        <link rel="manifest" href="/manifest.json" />
       </head>
       <body
         className={`${inter.variable} ${geistSans.variable} ${geistMono.variable} ${livvic.variable} antialiased min-h-screen flex flex-col`}

@@ -70,20 +70,20 @@ export function Header() {
   return (
     <header
       className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-in-out",
+        "fixed top-0 left-0 right-0 z-50 border-b border-transparent transition-[background-color,backdrop-filter,box-shadow,border-bottom-color] duration-500 ease-out will-change-[background-color,backdrop-filter]",
         isScrolled ? "nav-scrolled" : "bg-transparent"
       )}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <nav className={cn(
-          "flex items-center justify-between transition-all duration-500",
+          "flex items-center justify-between transition-[height,gap] duration-500 ease-out",
           isScrolled ? "h-16" : "h-20"
         )}>
           {/* Logo */}
           <Link
             href="/"
             className={cn(
-              "text-white font-bold hover:opacity-80 transition-all duration-500 uppercase tracking-[0.3em] sm:tracking-[0.5em]",
+              "text-white font-bold hover:opacity-80 transition-[font-size,opacity] duration-500 ease-out uppercase tracking-[0.3em] sm:tracking-[0.5em]",
               isScrolled ? "text-sm sm:text-base md:text-lg" : "text-base sm:text-lg md:text-xl lg:text-2xl"
             )}
             style={{ fontFamily: "var(--font-livvic), sans-serif" }}
@@ -95,7 +95,7 @@ export function Header() {
 
           {/* Desktop Navigation */}
           <div className={cn(
-            "hidden md:flex items-center transition-all duration-500",
+            "hidden md:flex items-center transition-[gap] duration-500 ease-out",
             isScrolled ? "gap-6" : "gap-8"
           )}>
             {navLinks.map((link) => (
@@ -103,7 +103,7 @@ export function Header() {
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "font-medium tracking-wide transition-all duration-300 relative group",
+                  "font-medium tracking-wide transition-[font-size,color] duration-300 ease-out relative group",
                   isScrolled ? "text-sm" : "text-base",
                   pathname === link.href
                     ? "text-white"
@@ -115,7 +115,7 @@ export function Header() {
                 {link.label}
                 <span
                   className={cn(
-                    "absolute -bottom-1 left-0 h-0.5 bg-white transition-all duration-300",
+                    "absolute -bottom-1 left-0 h-0.5 bg-white transition-[width] duration-300 ease-out",
                     pathname === link.href ? "w-full" : "w-0 group-hover:w-full"
                   )}
                 />
@@ -153,7 +153,7 @@ export function Header() {
                     href={link.href}
                     onClick={closeMobileMenu}
                     className={cn(
-                      "text-lg font-medium transition-all duration-300 py-2",
+                      "text-lg font-medium transition-[color,padding-left] duration-300 ease-out py-2",
                       pathname === link.href
                         ? "text-white border-l-2 border-white pl-4"
                         : "text-white/70 hover:text-white pl-4 hover:pl-6"

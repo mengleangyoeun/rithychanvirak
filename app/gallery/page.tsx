@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { motion } from 'motion/react'
 import { Search, Folder, ArrowRight } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { CollectionCardSkeleton } from '@/components/collection-card-skeleton'
 
 interface Collection {
   _id: string
@@ -71,13 +72,7 @@ export default function GalleryPage() {
     setFilteredCollections(filtered)
   }, [collections, searchTerm])
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-foreground/70">Loading gallery...</div>
-      </div>
-    )
-  }
+  // Remove the old loading check - we'll show skeletons inline instead
 
   const totalPhotos = collections.reduce((total, collection) => total + (collection.totalPhotos || 0), 0)
 
@@ -106,14 +101,16 @@ export default function GalleryPage() {
               <div className="w-20 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
             </div>
 
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="text-xl text-white/70 max-w-2xl mx-auto mb-8"
-            >
-              Explore {collections.length} collection{collections.length !== 1 ? 's' : ''} featuring {totalPhotos} photograph{totalPhotos !== 1 ? 's' : ''}
-            </motion.p>
+            {!loading && (
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.2 }}
+                className="text-xl text-white/70 max-w-2xl mx-auto mb-8"
+              >
+                Explore {collections.length} collection{collections.length !== 1 ? 's' : ''} featuring {totalPhotos} photograph{totalPhotos !== 1 ? 's' : ''}
+              </motion.p>
+            )}
 
             {/* Search */}
             <motion.div
@@ -133,7 +130,25 @@ export default function GalleryPage() {
           </motion.div>
 
           {/* Collections Grid */}
-          {filteredCollections.length > 0 ? (
+          {loading ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.4 }}
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+            >
+              {Array.from({ length: 6 }).map((_, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.5 + index * 0.1 }}
+                >
+                  <CollectionCardSkeleton />
+                </motion.div>
+              ))}
+            </motion.div>
+          ) : filteredCollections.length > 0 ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -168,23 +183,23 @@ export default function GalleryPage() {
                         />
                       )}
 
-                      {/* Gradient Overlay - stronger on hover */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent group-hover:from-black/80 group-hover:via-black/30 transition-all duration-500"></div>
+                      {/* Gradient Overlay - always visible, stronger on hover */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent md:from-black/40 md:via-black/10 md:group-hover:from-black/80 md:group-hover:via-black/30 transition-all duration-500"></div>
 
-                      {/* Content - hidden by default, shown on hover */}
-                      <div className="absolute inset-0 p-6 flex flex-col justify-end opacity-0 group-hover:opacity-100 transition-all duration-300">
-                        <h3 className="text-2xl font-bold text-white mb-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                      {/* Content - always visible on mobile, shown on hover on desktop */}
+                      <div className="absolute inset-0 p-6 flex flex-col justify-end md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
+                        <h3 className="text-2xl font-bold text-white mb-2 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300">
                           {collection.title}
                         </h3>
 
                         {collection.description && (
-                          <p className="text-sm text-white/80 mb-4 line-clamp-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 delay-75">
+                          <p className="text-sm text-white/80 mb-4 line-clamp-2 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300 md:delay-75">
                             {collection.description}
                           </p>
                         )}
 
                         {/* Stats */}
-                        <div className="flex items-center gap-4 text-xs text-white/70 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 delay-100">
+                        <div className="flex items-center gap-4 text-xs text-white/70 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300 md:delay-100">
                           <div className="flex items-center gap-1">
                             <span>📸</span>
                             <span>{collection.totalPhotos}</span>

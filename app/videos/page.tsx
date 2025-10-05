@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { motion, AnimatePresence } from 'motion/react'
 import { Search, Play, Grid2x2, List } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { VideoCardSkeleton } from '@/components/video-card-skeleton'
 
 interface Video {
   _id: string
@@ -138,8 +139,8 @@ function VideoCard({ video, index, viewMode }: { video: Video; index: number; vi
                 transition={{ duration: 0.3 }}
                 className="absolute inset-0 flex items-center justify-center z-30"
               >
-                <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center group-hover:bg-white/30 group-hover:scale-110 transition-all duration-300">
-                  <Play className="w-8 h-8 text-white ml-1" fill="white" />
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center group-hover:bg-white/30 group-hover:scale-110 transition-all duration-300">
+                  <Play className="w-6 h-6 sm:w-8 sm:h-8 text-white ml-0.5 sm:ml-1" fill="white" />
                 </div>
               </motion.div>
             )}
@@ -147,31 +148,31 @@ function VideoCard({ video, index, viewMode }: { video: Video; index: number; vi
 
           {/* Info Overlay - Slides down and fades out on hover */}
           <motion.div
-            className="absolute bottom-0 left-0 right-0 p-6 z-30"
+            className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 z-30"
             animate={{
               y: isHovered ? 20 : 0,
               opacity: isHovered ? 0 : 1
             }}
             transition={{ duration: 0.3, ease: "easeOut" }}
           >
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start justify-between gap-2 sm:gap-4">
               <div className="flex-1">
-                <h3 className="text-xl font-bold text-white mb-2">
+                <h3 className="text-base sm:text-lg md:text-xl font-bold text-white mb-1 sm:mb-2 line-clamp-2">
                   {video.title}
                 </h3>
                 {video.description && (
-                  <p className="text-sm text-white/70 line-clamp-2 mb-3">
+                  <p className="text-xs sm:text-sm text-white/70 line-clamp-2 mb-2 sm:mb-3 hidden sm:block">
                     {video.description}
                   </p>
                 )}
-                <div className="flex flex-wrap items-center gap-2 text-xs text-white/60">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs text-white/60">
                   {video.category && (
-                    <span className="px-3 py-1 bg-white/10 rounded-full">
+                    <span className="px-2 py-0.5 sm:px-3 sm:py-1 bg-white/10 rounded-full">
                       {video.category}
                     </span>
                   )}
                   {video.year && (
-                    <span className="px-3 py-1 bg-white/10 rounded-full">
+                    <span className="px-2 py-0.5 sm:px-3 sm:py-1 bg-white/10 rounded-full">
                       {video.year}
                     </span>
                   )}
@@ -244,14 +245,6 @@ export default function VideosPage() {
 
   const categories = ['all', ...Array.from(new Set(videos.map(v => v.category).filter(Boolean)))] as string[]
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-foreground/70">Loading videos...</div>
-      </div>
-    )
-  }
-
   return (
     <main className="unified-background min-h-screen">
       <div className="relative py-24 px-4 sm:px-6 lg:px-8">
@@ -277,14 +270,16 @@ export default function VideosPage() {
               <div className="w-20 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
             </div>
 
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="text-xl text-white/70 max-w-2xl mx-auto mb-8"
-            >
-              Explore {videos.length} video{videos.length !== 1 ? 's' : ''} showcasing my videography work
-            </motion.p>
+            {!loading && (
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.2 }}
+                className="text-xl text-white/70 max-w-2xl mx-auto mb-8"
+              >
+                Explore {videos.length} video{videos.length !== 1 ? 's' : ''} showcasing my videography work
+              </motion.p>
+            )}
 
             {/* Search and View Toggle */}
             <motion.div
@@ -351,7 +346,29 @@ export default function VideosPage() {
           </motion.div>
 
           {/* Videos Grid */}
-          {filteredVideos.length > 0 ? (
+          {loading ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.5 }}
+              className={
+                viewMode === 'grid'
+                  ? 'grid grid-cols-1 md:grid-cols-2 gap-6'
+                  : 'space-y-8'
+              }
+            >
+              {Array.from({ length: 4 }).map((_, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.6 + index * 0.1 }}
+                >
+                  <VideoCardSkeleton />
+                </motion.div>
+              ))}
+            </motion.div>
+          ) : filteredVideos.length > 0 ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

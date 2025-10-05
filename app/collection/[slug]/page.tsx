@@ -10,6 +10,8 @@ import { motion } from 'motion/react'
 import { ArrowLeft, Folder, Eye, ArrowUpDown } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import { FullscreenPhotoPreview } from '@/components/fullscreen-photo-preview'
+import { PhotoGridSkeleton } from '@/components/photo-grid-skeleton'
+import { CollectionCardSkeleton } from '@/components/collection-card-skeleton'
 
 interface Photo {
   _id: string
@@ -137,15 +139,9 @@ export default function CollectionPage({ params }: CollectionPageProps) {
     }
   })
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-foreground/70">Loading...</div>
-      </div>
-    )
-  }
+  // Removed early return for loading - show skeleton inline instead
 
-  if (!collection) {
+  if (!loading && !collection) {
     notFound()
   }
 
@@ -177,43 +173,71 @@ export default function CollectionPage({ params }: CollectionPageProps) {
             transition={{ duration: 0.8 }}
             className="mb-16"
           >
-            <h1
-              className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold text-white mb-4 tracking-tight leading-none"
-              style={{ fontFamily: 'var(--font-kantumruy-pro), sans-serif' }}
-            >
-              {collection.title}
-            </h1>
+            {loading ? (
+              <>
+                <div className="h-16 sm:h-20 md:h-24 w-3/4 bg-white/10 rounded animate-pulse mb-4" />
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-20 h-px bg-gradient-to-r from-white/30 to-transparent"></div>
+                  <div className="w-2 h-2 bg-white/40 rounded-full"></div>
+                </div>
+                <div className="h-6 w-full max-w-3xl bg-white/10 rounded animate-pulse mb-2" />
+                <div className="h-6 w-2/3 max-w-2xl bg-white/10 rounded animate-pulse" />
+              </>
+            ) : (
+              <>
+                <h1
+                  className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold text-white mb-4 tracking-tight leading-none"
+                  style={{ fontFamily: 'var(--font-kantumruy-pro), sans-serif' }}
+                >
+                  {collection?.title}
+                </h1>
 
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-20 h-px bg-gradient-to-r from-white/30 to-transparent"></div>
-              <div className="w-2 h-2 bg-white/40 rounded-full"></div>
-            </div>
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-20 h-px bg-gradient-to-r from-white/30 to-transparent"></div>
+                  <div className="w-2 h-2 bg-white/40 rounded-full"></div>
+                </div>
 
-            {collection.description && (
-              <p className="text-xl text-white/70 max-w-3xl leading-relaxed">
-                {collection.description}
-              </p>
+                {collection?.description && (
+                  <p className="text-xl text-white/70 max-w-3xl leading-relaxed">
+                    {collection.description}
+                  </p>
+                )}
+
+                {/* Stats */}
+                <div className="flex items-center gap-6 mt-6">
+                  {photos.length > 0 && (
+                    <div className="flex items-center gap-2 text-white/60">
+                      <span>📸</span>
+                      <span>{photos.length} photo{photos.length !== 1 ? 's' : ''}</span>
+                    </div>
+                  )}
+                  {collection?.childCollections && collection.childCollections.length > 0 && (
+                    <div className="flex items-center gap-2 text-white/60">
+                      <span>📁</span>
+                      <span>{collection.childCollections.length} sub-collection{collection.childCollections.length !== 1 ? 's' : ''}</span>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
-
-            {/* Stats */}
-            <div className="flex items-center gap-6 mt-6">
-              {photos.length > 0 && (
-                <div className="flex items-center gap-2 text-white/60">
-                  <span>📸</span>
-                  <span>{photos.length} photo{photos.length !== 1 ? 's' : ''}</span>
-                </div>
-              )}
-              {collection.childCollections && collection.childCollections.length > 0 && (
-                <div className="flex items-center gap-2 text-white/60">
-                  <span>📁</span>
-                  <span>{collection.childCollections.length} sub-collection{collection.childCollections.length !== 1 ? 's' : ''}</span>
-                </div>
-              )}
-            </div>
           </motion.div>
 
           {/* Sub-Collections */}
-          {collection.childCollections && collection.childCollections.length > 0 && (
+          {loading ? (
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="mb-16"
+            >
+              <div className="h-8 w-48 bg-white/10 rounded animate-pulse mb-6" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <CollectionCardSkeleton key={index} />
+                ))}
+              </div>
+            </motion.div>
+          ) : collection?.childCollections && collection.childCollections.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
@@ -244,16 +268,16 @@ export default function CollectionPage({ params }: CollectionPageProps) {
                           />
                         )}
 
-                        {/* Gradient Overlay - stronger on hover */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent group-hover:from-black/80 group-hover:via-black/30 transition-all duration-500"></div>
+                        {/* Gradient Overlay - always visible, stronger on hover */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent md:from-black/40 md:via-black/10 md:group-hover:from-black/80 md:group-hover:via-black/30 transition-all duration-500"></div>
 
-                        {/* Content - hidden by default, shown on hover */}
-                        <div className="absolute inset-0 p-6 flex flex-col justify-end opacity-0 group-hover:opacity-100 transition-all duration-300">
-                          <h3 className="text-xl font-bold text-white mb-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                        {/* Content - always visible on mobile, shown on hover on desktop */}
+                        <div className="absolute inset-0 p-6 flex flex-col justify-end md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
+                          <h3 className="text-xl font-bold text-white mb-2 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300">
                             {subCollection.title}
                           </h3>
                           {subCollection.description && (
-                            <p className="text-sm text-white/70 line-clamp-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 delay-75">
+                            <p className="text-sm text-white/70 line-clamp-2 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300 md:delay-75">
                               {subCollection.description}
                             </p>
                           )}
@@ -267,7 +291,19 @@ export default function CollectionPage({ params }: CollectionPageProps) {
           )}
 
           {/* Photos Grid */}
-          {photos.length > 0 && (
+          {loading ? (
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.4 }}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="h-8 w-32 bg-white/10 rounded animate-pulse" />
+                <div className="h-10 w-40 bg-white/10 rounded-lg animate-pulse" />
+              </div>
+              <PhotoGridSkeleton />
+            </motion.div>
+          ) : photos.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
@@ -283,8 +319,8 @@ export default function CollectionPage({ params }: CollectionPageProps) {
                   <span className="text-sm">{sortOrder === 'asc' ? 'Oldest First' : 'Newest First'}</span>
                 </button>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 auto-rows-[150px] md:auto-rows-[200px] gap-3 md:gap-4">
-                {sortedPhotos.filter(photo => photo.imageUrl).map((photo, index) => {
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 auto-rows-[150px] md:auto-rows-[200px] gap-3 md:gap-4" style={{ gridAutoFlow: 'dense' }}>
+                {sortedPhotos.filter(photo => photo.imageUrl && photo.imageId).map((photo, index) => {
                   // Calculate aspect ratio to determine grid span
                   const width = photo.imageWidth || 1200
                   const height = photo.imageHeight || 900
@@ -294,26 +330,30 @@ export default function CollectionPage({ params }: CollectionPageProps) {
                   let colSpan = 'col-span-1'
                   let rowSpan = 'row-span-1'
 
-                  if (aspectRatio > 1.5) {
-                    // Wide landscape
+                  if (aspectRatio > 2.0) {
+                    // Very wide panorama - 2 cols to preserve aspect
                     colSpan = 'col-span-2'
                     rowSpan = 'row-span-1'
-                  } else if (aspectRatio > 0.9 && aspectRatio <= 1.1) {
-                    // Square-ish
+                  } else if (aspectRatio > 1.4) {
+                    // Landscape - 2 cols to avoid squaring
+                    colSpan = 'col-span-2'
+                    rowSpan = 'row-span-1'
+                  } else if (aspectRatio >= 1.1) {
+                    // Slight landscape - single column
                     colSpan = 'col-span-1'
                     rowSpan = 'row-span-1'
-                  } else if (aspectRatio < 0.7) {
-                    // Tall portrait
+                  } else if (aspectRatio >= 0.9) {
+                    // Square
                     colSpan = 'col-span-1'
-                    rowSpan = 'row-span-2'
-                  } else if (aspectRatio <= 0.9) {
-                    // Portrait
+                    rowSpan = 'row-span-1'
+                  } else if (aspectRatio >= 0.65) {
+                    // Portrait - 2 rows for proper aspect
                     colSpan = 'col-span-1'
                     rowSpan = 'row-span-2'
                   } else {
-                    // Landscape
-                    colSpan = 'col-span-2'
-                    rowSpan = 'row-span-1'
+                    // Very tall portrait
+                    colSpan = 'col-span-1'
+                    rowSpan = 'row-span-2'
                   }
 
                   return (
@@ -330,14 +370,24 @@ export default function CollectionPage({ params }: CollectionPageProps) {
                       }}
                     >
                       <div className="relative h-full overflow-hidden rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 transition-all duration-500 hover:border-white/20 hover:scale-[1.02]">
-                        <Image
-                          src={getThumbnailUrl(photo.imageId)}
-                          alt={photo.alt || photo.title}
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                          loading={index < 12 ? 'eager' : 'lazy'}
-                        />
+                        {photo.imageId ? (
+                          <Image
+                            src={getThumbnailUrl(photo.imageId)}
+                            alt={photo.alt || photo.title}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                            loading={index < 12 ? 'eager' : 'lazy'}
+                            onError={(e) => {
+                              console.error('Image failed to load:', photo.imageId)
+                              e.currentTarget.style.display = 'none'
+                            }}
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center bg-white/5">
+                            <span className="text-white/30 text-xs">No image</span>
+                          </div>
+                        )}
 
                         {/* Hover Overlay */}
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
@@ -354,7 +404,7 @@ export default function CollectionPage({ params }: CollectionPageProps) {
           )}
 
           {/* Empty State */}
-          {!collection.childCollections?.length && !photos.length && (
+          {!loading && !collection?.childCollections?.length && !photos.length && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
