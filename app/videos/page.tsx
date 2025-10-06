@@ -25,6 +25,7 @@ interface Video {
 
 function VideoCard({ video, index, viewMode }: { video: Video; index: number; viewMode: 'grid' | 'full' }) {
   const [isHovered, setIsHovered] = useState(false)
+  const [embedError, setEmbedError] = useState(false)
 
   const getVideoThumbnail = (vid: Video) => {
     if (vid.thumbnail?.asset?._ref) {
@@ -116,12 +117,49 @@ function VideoCard({ video, index, viewMode }: { video: Video; index: number; vi
                 transition={{ duration: 0.3 }}
                 className="absolute inset-0 z-10"
               >
-                <iframe
-                  src={getEmbedUrl(video)}
-                  className="w-full h-full pointer-events-none"
-                  allow="autoplay; muted"
-                  style={{ border: 'none' }}
-                />
+                {!embedError ? (
+                  <iframe
+                    src={getEmbedUrl(video)}
+                    className="w-full h-full pointer-events-none"
+                    allow="autoplay; muted"
+                    style={{ border: 'none' }}
+                    onError={() => setEmbedError(true)}
+                    onLoad={() => {
+                      // Reset error state on successful load
+                      setEmbedError(false)
+                      // Check for blocked content
+                      setTimeout(() => {
+                        try {
+                          const iframe = document.querySelector(`iframe[src*="${video.videoType}"]`) as HTMLIFrameElement
+                          if (iframe) {
+                            const checkContent = () => {
+                              try {
+                                const doc = iframe.contentDocument || iframe.contentWindow?.document
+                                if (doc && doc.body && doc.body.textContent?.includes('blocked')) {
+                                  setEmbedError(true)
+                                }
+                              } catch {
+                                // Cross-origin error, assume it's working
+                              }
+                            }
+                            setTimeout(checkContent, 1000)
+                          }
+                        } catch {
+                          // Ignore cross-origin errors
+                        }
+                      }, 500)
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-black/80">
+                    <div className="text-center p-4">
+                      <svg className="w-8 h-8 mx-auto mb-2 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                      <p className="text-xs text-white/70">Preview unavailable</p>
+                    </div>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

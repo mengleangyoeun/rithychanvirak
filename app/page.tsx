@@ -9,6 +9,9 @@ const Portfolio = dynamic(() => import('@/components/sections/portfolio').then(m
 const Works = dynamic(() => import('@/components/sections/works').then(mod => ({ default: mod.Works })), {
   loading: () => <div className="py-24 text-center text-white/50">Loading...</div>
 })
+const Videos = dynamic(() => import('@/components/sections/videos').then(mod => ({ default: mod.Videos })), {
+  loading: () => <div className="py-24 text-center text-white/50">Loading...</div>
+})
 const Services = dynamic(() => import('@/components/sections/services').then(mod => ({ default: mod.Services })), {
   loading: () => <div className="py-24 text-center text-white/50">Loading...</div>
 })
@@ -63,6 +66,22 @@ async function getHeroData() {
   `)
 }
 
+async function getFeaturedVideos() {
+  return client.fetch(`
+    *[_type == "video" && featured == true] | order(order asc, year desc)[0...6] {
+      _id,
+      title,
+      slug,
+      videoUrl,
+      videoType,
+      thumbnailUrl,
+      thumbnailId,
+      category,
+      year
+    }
+  `)
+}
+
 async function getFeaturedServices() {
   return client.fetch(`
     *[_type == "service" && featured == true && active == true] | order(number asc) {
@@ -80,10 +99,11 @@ async function getFeaturedServices() {
 export const revalidate = 60
 
 export default async function HomePage() {
-  const [photosData, collectionsData, heroData, servicesData] = await Promise.all([
+  const [photosData, collectionsData, heroData, videosData, servicesData] = await Promise.all([
     getFeaturedPhotos().catch(() => []),
     getFeaturedCollections().catch(() => []),
     getHeroData().catch(() => null),
+    getFeaturedVideos().catch(() => []),
     getFeaturedServices().catch(() => [])
   ])
 
@@ -96,6 +116,7 @@ export default async function HomePage() {
       <main className="unified-background">
         <Portfolio collections={collectionsWithTotals} />
         <Works photos={photosData} />
+        <Videos videos={videosData} />
         <Services services={servicesData} />
         <CTA />
       </main>

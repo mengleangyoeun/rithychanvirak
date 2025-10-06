@@ -36,6 +36,12 @@ export const SafeDeleteAction: DocumentActionComponent = (props) => {
         }`
       } else if (type === 'photo') {
         query = `*[references($id)] {_id, _type, title}`
+      } else if (type === 'video') {
+        // Videos don't typically have references, but check anyway
+        query = `*[references($id)] {_id, _type, title}`
+      } else {
+        // For any other document type, check for references
+        query = `*[references($id)] {_id, _type, title}`
       }
 
       const result = await client.fetch(query, { id })
@@ -143,33 +149,21 @@ export const SafeDeleteAction: DocumentActionComponent = (props) => {
     label: 'Delete',
     icon: TrashIcon,
     tone: 'critical',
+    disabled: isDeleting,
     onHandle: () => {
       setDialogOpen(true)
       setShowForceMode(false)
-      checkReferences()
     },
-    dialog: dialogOpen && {
+    dialog: dialogOpen ? {
       type: 'confirm',
       tone: 'critical',
       onCancel: () => {
         setDialogOpen(false)
         setShowForceMode(false)
       },
-      onConfirm: async () => {
-        if (references.length > 0 && !showForceMode) {
-          setShowForceMode(true)
-          return
-        }
-
-        if (references.length > 0 && showForceMode) {
-          await handleForceDelete()
-          return
-        }
-
-        await handleDelete()
-      },
+      onConfirm: handleDelete,
       message: getDialogMessage(),
       confirmButtonText: getConfirmButtonText()
-    }
+    } : false
   }
 }

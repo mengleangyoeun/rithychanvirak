@@ -54,9 +54,10 @@ export const bulkUploadPlugin = definePlugin({
   ]
 })
 
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react'
 import { useClient } from 'sanity'
 import imageCompression from 'browser-image-compression'
+import exifr from 'exifr'
 
 interface Collection {
   _id: string
@@ -85,7 +86,7 @@ function BulkUploadComponent() {
   const [compressionSavings, setCompressionSavings] = useState({ original: 0, compressed: 0 })
 
   // Fetch collections on component mount
-  const fetchCollections = () => {
+  const fetchCollections = useCallback(() => {
     client
       .fetch(`*[_type == "collection"]{
         _id,
@@ -99,11 +100,11 @@ function BulkUploadComponent() {
       }`)
       .then(setCollections)
       .catch(console.error)
-  }
+  }, [client])
 
   React.useEffect(() => {
     fetchCollections()
-  }, [client])
+  }, [fetchCollections])
 
   // Compress image before upload
   const compressImage = async (file: File): Promise<File> => {
@@ -112,7 +113,8 @@ function BulkUploadComponent() {
       maxWidthOrHeight: 2048, // Max width or height (good for web)
       useWebWorker: true,
       fileType: 'image/jpeg', // Convert to JPEG for better compression
-      initialQuality: 0.85 // 85% quality - great balance
+      initialQuality: 0.85, // 85% quality - great balance
+      preserveExif: true // IMPORTANT: Keep EXIF metadata
     }
 
     try {
@@ -171,6 +173,7 @@ function BulkUploadComponent() {
     // Add Cloudinary transformations for additional compression
     formData.append('quality', 'auto:good') // Auto-optimize quality
     formData.append('fetch_format', 'auto') // Auto-select best format (WebP, AVIF, etc.)
+    formData.append('image_metadata', 'true') // Preserve EXIF metadata
 
     const response = await fetch(
       `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
@@ -221,6 +224,21 @@ function BulkUploadComponent() {
           setCurrentFile(file.name)
           setProgress(`🗜️ Compressing & uploading ${globalIndex + 1}/${filesArray.length} to ${displayPath}`)
 
+          // Extract EXIF data from original file before compression
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let exifData: any = null
+          try {
+            exifData = await exifr.parse(file, {
+              tiff: true,
+              exif: true,
+              gps: false,
+              interop: false,
+              ifd1: false
+            })
+          } catch (error) {
+            console.warn('Could not extract EXIF from', file.name, error)
+          }
+
           // Compress image before uploading
           const compressedFile = await compressImage(file)
 
@@ -231,7 +249,9 @@ function BulkUploadComponent() {
           const photoTitle = file.name.replace(/\.[^/.]+$/, '')
           const photoSlug = photoTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-')
 
-          const photoDoc = {
+          // Prepare photo document
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const photoDoc: any = {
             _type: 'photo',
             title: photoTitle,
             slug: {
@@ -250,10 +270,54 @@ function BulkUploadComponent() {
             featured: false
           }
 
+          // Add EXIF metadata if available
+          if (exifData) {
+            // Camera info
+            if (exifData.Make && exifData.Model) {
+              photoDoc.camera = `${exifData.Make} ${exifData.Model}`.trim()
+            }
+            if (exifData.LensModel) {
+              photoDoc.lens = exifData.LensModel
+            }
+
+            // Camera settings
+            if (exifData.FNumber || exifData.ExposureTime || exifData.ISO || exifData.FocalLength) {
+              photoDoc.settings = {
+                _type: 'object',
+                aperture: exifData.FNumber ? String(exifData.FNumber) : undefined,
+                shutter: exifData.ExposureTime ? (exifData.ExposureTime < 1 ? `1/${Math.round(1/exifData.ExposureTime)}` : String(exifData.ExposureTime)) : undefined,
+                iso: exifData.ISO ? String(exifData.ISO) : undefined,
+                focalLength: exifData.FocalLength ? String(Math.round(exifData.FocalLength)) : undefined
+              }
+            }
+
+            // Capture date
+            if (exifData.DateTimeOriginal) {
+              const date = new Date(exifData.DateTimeOriginal)
+              if (!isNaN(date.getTime())) {
+                photoDoc.captureDate = date.toISOString().split('T')[0]
+              }
+            }
+
+            // Raw EXIF data
+            photoDoc.exifData = {
+              _type: 'object',
+              make: exifData.Make,
+              model: exifData.Model,
+              lensModel: exifData.LensModel,
+              fNumber: exifData.FNumber,
+              exposureTime: exifData.ExposureTime ? String(exifData.ExposureTime) : undefined,
+              iso: exifData.ISO,
+              focalLength: exifData.FocalLength,
+              dateTimeOriginal: exifData.DateTimeOriginal ? new Date(exifData.DateTimeOriginal).toISOString() : undefined,
+              software: exifData.Software
+            }
+          }
+
           await client.create(photoDoc)
           setUploadedCount(prev => prev + 1)
           setUploadedFiles(prev => [...prev, file.name])
-          
+
           return photoDoc
         })
         

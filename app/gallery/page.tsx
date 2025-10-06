@@ -188,7 +188,10 @@ export default function GalleryPage() {
 
                       {/* Content - always visible on mobile, shown on hover on desktop */}
                       <div className="absolute inset-0 p-6 flex flex-col justify-end md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
-                        <h3 className="text-2xl font-bold text-white mb-2 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300">
+                        <h3
+                          className="text-2xl font-bold text-white mb-2 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300"
+                          style={{ fontFamily: /[\u1780-\u17FF]/.test(collection.title) ? '"Kantumruy Pro", sans-serif' : undefined }}
+                        >
                           {collection.title}
                         </h3>
 

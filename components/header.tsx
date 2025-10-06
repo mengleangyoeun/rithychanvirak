@@ -102,6 +102,7 @@ export function Header() {
               <Link
                 key={link.href}
                 href={link.href}
+                prefetch={true}
                 className={cn(
                   "font-medium tracking-wide transition-[font-size,color] duration-300 ease-out relative group",
                   isScrolled ? "text-sm" : "text-base",
@@ -151,6 +152,7 @@ export function Header() {
                   <Link
                     key={link.href}
                     href={link.href}
+                    prefetch={true}
                     onClick={closeMobileMenu}
                     className={cn(
                       "text-lg font-medium transition-[color,padding-left] duration-300 ease-out py-2",

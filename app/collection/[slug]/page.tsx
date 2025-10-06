@@ -15,6 +15,7 @@ import { CollectionCardSkeleton } from '@/components/collection-card-skeleton'
 
 interface Photo {
   _id: string
+  _createdAt?: string
   title: string
   slug: { current: string }
   imageUrl: string
@@ -76,8 +77,9 @@ async function getCollectionBySlug(slug: string) {
 
 async function getCollectionPhotos(collectionId: string) {
   return client.fetch(`
-    *[_type == "photo" && references($collectionId)] | order(_createdAt asc) {
+    *[_type == "photo" && references($collectionId)] {
       _id,
+      _createdAt,
       title,
       slug,
       imageUrl,
@@ -99,6 +101,7 @@ export default function CollectionPage({ params }: CollectionPageProps) {
   const resolvedParams = use(params)
   const [collection, setCollection] = useState<Collection | null>(null)
   const [photos, setPhotos] = useState<Photo[]>([])
+  const [sortBy, setSortBy] = useState<'date' | 'name' | 'capture'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [loading, setLoading] = useState(true)
   const [fullscreenOpen, setFullscreenOpen] = useState(false)
@@ -130,13 +133,68 @@ export default function CollectionPage({ params }: CollectionPageProps) {
     fetchData()
   }, [resolvedParams.slug])
 
-  // Sort photos based on sortOrder
+  // Sort photos based on sortBy and sortOrder
   const sortedPhotos = [...photos].sort((a, b) => {
-    if (sortOrder === 'asc') {
-      return a._id.localeCompare(b._id)
-    } else {
-      return b._id.localeCompare(a._id)
+    let comparison = 0
+
+    switch (sortBy) {
+      case 'name':
+        // Extract base name and number for smart sorting (handles "Rak(1)", "Rak(2)", etc.)
+        const extractParts = (title: string) => {
+          // Match patterns like "Name(123)" or "Name_123" or "Name 123"
+          const match = title.match(/^(.*?)[\s_\(]*(\d+)[\)\s_]*$/);
+          if (match) {
+            return { base: match[1].trim(), num: parseInt(match[2], 10) };
+          }
+          return { base: title, num: 0 };
+        };
+
+        const aParts = extractParts(a.title);
+        const bParts = extractParts(b.title);
+
+        // First compare base names
+        const baseComparison = aParts.base.localeCompare(bParts.base, undefined, {
+          sensitivity: 'base',
+          numeric: true
+        });
+
+        // If base names are the same, compare numbers
+        if (baseComparison === 0) {
+          comparison = aParts.num - bParts.num;
+        } else {
+          comparison = baseComparison;
+        }
+        break
+      case 'capture':
+        // Handle missing capture dates - put them at the end
+        const hasDateA = !!a.captureDate
+        const hasDateB = !!b.captureDate
+
+        if (!hasDateA && !hasDateB) {
+          comparison = 0
+        } else if (!hasDateA) {
+          // a has no date, put it at the end (return positive value)
+          comparison = 1
+        } else if (!hasDateB) {
+          // b has no date, put it at the end (return negative value)
+          comparison = -1
+        } else {
+          // Both have dates, compare them
+          const dateA = new Date(a.captureDate!).getTime()
+          const dateB = new Date(b.captureDate!).getTime()
+          comparison = dateA - dateB
+        }
+        break
+      case 'date':
+      default:
+        // Sort by creation date (_createdAt)
+        const createdA = a._createdAt ? new Date(a._createdAt).getTime() : 0
+        const createdB = b._createdAt ? new Date(b._createdAt).getTime() : 0
+        comparison = createdA - createdB
+        break
     }
+
+    return sortOrder === 'asc' ? comparison : -comparison
   })
 
   // Removed early return for loading - show skeleton inline instead
@@ -187,7 +245,7 @@ export default function CollectionPage({ params }: CollectionPageProps) {
               <>
                 <h1
                   className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold text-white mb-4 tracking-tight leading-none"
-                  style={{ fontFamily: 'var(--font-kantumruy-pro), sans-serif' }}
+                  style={{ fontFamily: /[\u1780-\u17FF]/.test(collection?.title || '') ? '"Kantumruy Pro", sans-serif' : 'var(--font-livvic), sans-serif' }}
                 >
                   {collection?.title}
                 </h1>
@@ -273,7 +331,10 @@ export default function CollectionPage({ params }: CollectionPageProps) {
 
                         {/* Content - always visible on mobile, shown on hover on desktop */}
                         <div className="absolute inset-0 p-6 flex flex-col justify-end md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
-                          <h3 className="text-xl font-bold text-white mb-2 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300">
+                          <h3
+                            className="text-xl font-bold text-white mb-2 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300"
+                            style={{ fontFamily: /[\u1780-\u17FF]/.test(subCollection.title) ? '"Kantumruy Pro", sans-serif' : undefined }}
+                          >
                             {subCollection.title}
                           </h3>
                           {subCollection.description && (
@@ -309,59 +370,74 @@ export default function CollectionPage({ params }: CollectionPageProps) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.4 }}
             >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-white">Photos</h2>
-                <button
-                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                  className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/10 hover:border-white/20 rounded-lg text-white transition-all"
-                >
-                  <ArrowUpDown className="w-4 h-4" />
-                  <span className="text-sm">{sortOrder === 'asc' ? 'Oldest First' : 'Newest First'}</span>
-                </button>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-2xl font-bold text-white">Photos</h2>
+                  <span className="text-sm text-white/50">({sortedPhotos.length})</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as 'date' | 'name' | 'capture')}
+                    className="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/10 hover:border-white/20 rounded-lg text-white text-sm transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-white/30"
+                  >
+                    <option value="date" className="bg-black text-white">Upload Date</option>
+                    <option value="name" className="bg-black text-white">Name (A-Z)</option>
+                    <option value="capture" className="bg-black text-white">Capture Date</option>
+                  </select>
+                  <button
+                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                    className="flex items-center gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/10 hover:border-white/20 rounded-lg text-white transition-all"
+                    title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                  >
+                    <ArrowUpDown className="w-4 h-4" />
+                    <span className="text-sm">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                  </button>
+                </div>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 auto-rows-[150px] md:auto-rows-[200px] gap-3 md:gap-4" style={{ gridAutoFlow: 'dense' }}>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 auto-rows-[180px] sm:auto-rows-[200px] md:auto-rows-[220px] gap-2 sm:gap-3 md:gap-4" style={{ gridAutoFlow: 'dense' }}>
                 {sortedPhotos.filter(photo => photo.imageUrl && photo.imageId).map((photo, index) => {
                   // Calculate aspect ratio to determine grid span
                   const width = photo.imageWidth || 1200
                   const height = photo.imageHeight || 900
                   const aspectRatio = width / height
 
-                  // Determine row and column span based on aspect ratio
+                  // Determine row and column span based on aspect ratio - improved algorithm
                   let colSpan = 'col-span-1'
                   let rowSpan = 'row-span-1'
 
-                  if (aspectRatio > 2.0) {
-                    // Very wide panorama - 2 cols to preserve aspect
+                  if (aspectRatio > 2.5) {
+                    // Ultra-wide panorama
+                    colSpan = 'col-span-2 md:col-span-3'
+                    rowSpan = 'row-span-1'
+                  } else if (aspectRatio > 1.8) {
+                    // Wide panorama
                     colSpan = 'col-span-2'
                     rowSpan = 'row-span-1'
-                  } else if (aspectRatio > 1.4) {
-                    // Landscape - 2 cols to avoid squaring
+                  } else if (aspectRatio > 1.3) {
+                    // Landscape
                     colSpan = 'col-span-2'
-                    rowSpan = 'row-span-1'
-                  } else if (aspectRatio >= 1.1) {
-                    // Slight landscape - single column
-                    colSpan = 'col-span-1'
                     rowSpan = 'row-span-1'
                   } else if (aspectRatio >= 0.9) {
-                    // Square
+                    // Square-ish
                     colSpan = 'col-span-1'
                     rowSpan = 'row-span-1'
-                  } else if (aspectRatio >= 0.65) {
-                    // Portrait - 2 rows for proper aspect
+                  } else if (aspectRatio >= 0.6) {
+                    // Portrait
                     colSpan = 'col-span-1'
                     rowSpan = 'row-span-2'
                   } else {
-                    // Very tall portrait
+                    // Tall portrait
                     colSpan = 'col-span-1'
-                    rowSpan = 'row-span-2'
+                    rowSpan = 'row-span-2 md:row-span-3'
                   }
 
                   return (
                     <motion.div
                       key={photo._id}
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, delay: 0.5 + Math.min(index * 0.05, 0.8) }}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.4, delay: Math.min(index * 0.03, 0.6) }}
                       className={`group cursor-pointer ${colSpan} ${rowSpan}`}
                       onClick={() => {
                         setSelectedPhoto(photo)
@@ -369,15 +445,15 @@ export default function CollectionPage({ params }: CollectionPageProps) {
                         setFullscreenOpen(true)
                       }}
                     >
-                      <div className="relative h-full overflow-hidden rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 transition-all duration-500 hover:border-white/20 hover:scale-[1.02]">
+                      <div className="relative h-full overflow-hidden rounded-lg md:rounded-xl bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-sm border border-white/10 transition-all duration-500 hover:border-white/30 hover:shadow-xl hover:shadow-white/5 hover:scale-[1.01] group-hover:from-white/10 group-hover:to-white/5">
                         {photo.imageId ? (
                           <Image
                             src={getThumbnailUrl(photo.imageId)}
                             alt={photo.alt || photo.title}
                             fill
-                            className="object-cover"
-                            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                            loading={index < 12 ? 'eager' : 'lazy'}
+                            className="object-cover transition-transform duration-700 group-hover:scale-105"
+                            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                            loading={index < 15 ? 'eager' : 'lazy'}
                             onError={(e) => {
                               console.error('Image failed to load:', photo.imageId)
                               e.currentTarget.style.display = 'none'
@@ -389,11 +465,24 @@ export default function CollectionPage({ params }: CollectionPageProps) {
                           </div>
                         )}
 
+                        {/* Gradient Overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
                         {/* Hover Overlay */}
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                          <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
-                            <Eye className="w-6 h-6 text-white" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-[2px]">
+                          <div className="bg-white/20 backdrop-blur-md rounded-full p-3 border border-white/30 transform scale-90 group-hover:scale-100 transition-transform duration-300">
+                            <Eye className="w-5 h-5 md:w-6 md:h-6 text-white" />
                           </div>
+                        </div>
+
+                        {/* Photo Title - Shows on hover */}
+                        <div className="absolute bottom-0 left-0 right-0 p-2 md:p-3 transform translate-y-full group-hover:translate-y-0 transition-transform duration-300">
+                          <h3
+                            className="text-xs md:text-sm font-semibold text-white line-clamp-2 drop-shadow-lg"
+                            style={{ fontFamily: /[\u1780-\u17FF]/.test(photo.title) ? '"Kantumruy Pro", sans-serif' : undefined }}
+                          >
+                            {photo.title}
+                          </h3>
                         </div>
                       </div>
                     </motion.div>

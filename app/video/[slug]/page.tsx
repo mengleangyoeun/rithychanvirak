@@ -2,14 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import { client } from '@/sanity/lib/client'
-import { urlFor } from '@/sanity/lib/image'
+import { getThumbnailUrl } from '@/lib/cloudinary'
 import Image from 'next/image'
 import Link from 'next/link'
 import { motion } from 'motion/react'
 import { ArrowLeft, Calendar, Tag, Camera } from 'lucide-react'
 
 interface StoryboardImage {
-  asset: { _ref: string }
+  imageUrl: string
+  imageId: string
   alt?: string
   caption?: string
 }
@@ -20,7 +21,8 @@ interface Video {
   slug: { current: string }
   videoUrl: string
   videoType: 'youtube' | 'vimeo' | 'googledrive' | 'direct'
-  thumbnail?: { asset: { _ref: string }; alt?: string }
+  thumbnailUrl?: string
+  thumbnailId?: string
   description?: string
   category?: string
   year?: number
@@ -33,6 +35,8 @@ export default function VideoPage({ params }: { params: Promise<{ slug: string }
   const [relatedVideos, setRelatedVideos] = useState<Video[]>([])
   const [loading, setLoading] = useState(true)
   const [slug, setSlug] = useState<string>('')
+  const [embedError, setEmbedError] = useState(false)
+  const [aspectRatios, setAspectRatios] = useState<Record<number, number>>({})
 
   useEffect(() => {
     params.then((p) => setSlug(p.slug))
@@ -50,7 +54,8 @@ export default function VideoPage({ params }: { params: Promise<{ slug: string }
             slug,
             videoUrl,
             videoType,
-            thumbnail,
+            thumbnailUrl,
+            thumbnailId,
             description,
             category,
             year,
@@ -71,7 +76,8 @@ export default function VideoPage({ params }: { params: Promise<{ slug: string }
               slug,
               videoUrl,
               videoType,
-              thumbnail,
+              thumbnailUrl,
+              thumbnailId,
               category,
               year
             }`,
@@ -90,6 +96,20 @@ export default function VideoPage({ params }: { params: Promise<{ slug: string }
 
     fetchVideo()
   }, [slug])
+
+  useEffect(() => {
+    if (!video?.storyboard) return
+
+    video.storyboard.forEach((still, index) => {
+      if (aspectRatios[index] !== undefined) return
+
+      const img = document.createElement('img')
+      img.onload = () => {
+        setAspectRatios(prev => ({ ...prev, [index]: img.naturalWidth / img.naturalHeight }))
+      }
+      img.src = getThumbnailUrl(still.imageId, 600)
+    })
+  }, [video?.storyboard, aspectRatios])
 
   const getEmbedUrl = (video: Video) => {
     if (video.videoType === 'youtube') {
@@ -112,14 +132,12 @@ export default function VideoPage({ params }: { params: Promise<{ slug: string }
   }
 
   const getVideoThumbnail = (vid: Video) => {
-    if (vid.thumbnail?.asset?._ref) {
-      try {
-        return urlFor(vid.thumbnail).width(400).height(225).url()
-      } catch (error) {
-        console.error('Error generating thumbnail URL:', error)
-      }
+    // Use Cloudinary thumbnail if available
+    if (vid.thumbnailId) {
+      return getThumbnailUrl(vid.thumbnailId, 400)
     }
 
+    // Fallback to video platform thumbnails
     if (vid.videoType === 'youtube') {
       const videoId = vid.videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/)?.[1]
       if (videoId) {
@@ -220,13 +238,65 @@ export default function VideoPage({ params }: { params: Promise<{ slug: string }
             transition={{ duration: 0.6, delay: 0.2 }}
             className="mb-12"
           >
-            <div className="aspect-video rounded-2xl overflow-hidden bg-black shadow-2xl border border-white/10">
-              <iframe
-                src={getEmbedUrl(video)}
-                className="w-full h-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
+            <div className="aspect-video rounded-2xl overflow-hidden bg-black shadow-2xl border border-white/10 relative">
+              {!embedError ? (
+                <iframe
+                  src={getEmbedUrl(video)}
+                  className="w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  onError={() => setEmbedError(true)}
+                  onLoad={() => {
+                    // Check if embed failed after load
+                    setTimeout(() => {
+                      try {
+                        const iframe = document.querySelector('iframe[src*="youtube.com/embed"]') as HTMLIFrameElement
+                        if (iframe && iframe.contentWindow) {
+                          // Try to detect if content is blocked
+                          const checkContent = () => {
+                            try {
+                              const doc = iframe.contentDocument || iframe.contentWindow?.document
+                              if (doc && doc.body && doc.body.textContent?.includes('blocked')) {
+                                setEmbedError(true)
+                              }
+                            } catch {
+                              // Cross-origin error, assume it's working
+                            }
+                          }
+                          setTimeout(checkContent, 2000)
+                        }
+                      } catch {
+                        // Ignore cross-origin errors
+                      }
+                    }, 1000)
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-900 to-black">
+                  <div className="text-center p-8">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
+                      <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">Video Unavailable</h3>
+                    <p className="text-white/70 mb-6 max-w-md">
+                      This video cannot be embedded. Please watch it directly on the platform.
+                    </p>
+                    <a
+                      href={video.videoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
+                      </svg>
+                      Watch on {video.videoType === 'youtube' ? 'YouTube' : video.videoType === 'vimeo' ? 'Vimeo' : 'Platform'}
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
           </motion.div>
 
@@ -275,13 +345,13 @@ export default function VideoPage({ params }: { params: Promise<{ slug: string }
                     whileHover={{ y: -8 }}
                     className="group relative overflow-hidden rounded-xl transition-all duration-300"
                   >
-                    <div className="relative aspect-video overflow-hidden rounded-xl">
+                    <div className="relative overflow-hidden rounded-xl bg-white/5 border border-white/10" style={{ aspectRatio: aspectRatios[index] || 16/9 }}>
                       <Image
-                        src={urlFor(still).width(600).height(338).url()}
+                        src={getThumbnailUrl(still.imageId, 600)}
                         alt={still.alt || `Frame ${index + 1}`}
                         fill
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                        className="object-cover group-hover:scale-110 transition-transform duration-700"
+                        className="object-contain group-hover:scale-110 transition-transform duration-700"
                       />
 
                       {/* Subtle gradient overlay on hover */}

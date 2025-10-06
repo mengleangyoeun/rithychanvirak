@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
-import Link from 'next/link'
 import { motion } from 'motion/react'
 import { getThumbnailUrl } from '@/lib/cloudinary'
 import { Eye, Heart, Share2 } from 'lucide-react'
@@ -134,17 +133,21 @@ export function GalleryGrid({
                 {/* Photo Title Overlay */}
                 <div className="absolute bottom-0 left-0 right-0 p-4 transform translate-y-full group-hover:translate-y-0 transition-transform duration-300">
                   <div className="bg-card/95 backdrop-blur-md rounded-xl p-3 shadow-lg border border-border">
-                    <Link href={`/photo/${photo.slug.current}`}>
-                      <h3 className="font-bold text-sm text-foreground hover:text-blue-500 transition-colors line-clamp-1 mb-1">
-                        {photo.title}
-                      </h3>
-                      {photo.collection && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                          {photo.collection.title}
-                        </p>
-                      )}
-                    </Link>
+                    <h3
+                      className="font-bold text-sm text-foreground line-clamp-1 mb-1"
+                      style={{ fontFamily: /[\u1780-\u17FF]/.test(photo.title) ? '"Kantumruy Pro", sans-serif' : undefined }}
+                    >
+                      {photo.title}
+                    </h3>
+                    {photo.collection && (
+                      <p
+                        className="text-xs text-muted-foreground flex items-center gap-1"
+                        style={{ fontFamily: /[\u1780-\u17FF]/.test(photo.collection.title) ? '"Kantumruy Pro", sans-serif' : undefined }}
+                      >
+                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                        {photo.collection.title}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -226,17 +229,21 @@ export function GalleryGrid({
               {/* Photo Title Overlay */}
               <div className="absolute bottom-0 left-0 right-0 p-4 transform translate-y-full group-hover:translate-y-0 transition-transform duration-300">
                 <div className="bg-card/95 backdrop-blur-md rounded-xl p-3 shadow-lg border border-border">
-                  <Link href={`/photo/${photo.slug.current}`}>
-                    <h3 className="font-bold text-sm text-foreground hover:text-blue-500 transition-colors line-clamp-1 mb-1">
-                      {photo.title}
-                    </h3>
-                    {photo.collection && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                        {photo.collection.title}
-                      </p>
-                    )}
-                  </Link>
+                  <h3
+                    className="font-bold text-sm text-foreground line-clamp-1 mb-1"
+                    style={{ fontFamily: /[\u1780-\u17FF]/.test(photo.title) ? '"Kantumruy Pro", sans-serif' : undefined }}
+                  >
+                    {photo.title}
+                  </h3>
+                  {photo.collection && (
+                    <p
+                      className="text-xs text-muted-foreground flex items-center gap-1"
+                      style={{ fontFamily: /[\u1780-\u17FF]/.test(photo.collection.title) ? '"Kantumruy Pro", sans-serif' : undefined }}
+                    >
+                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                      {photo.collection.title}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

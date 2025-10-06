@@ -33,7 +33,7 @@ export function usePerformanceMonitoring() {
 
     try {
       fcpObserver.observe({ entryTypes: ['paint'] })
-    } catch (e) {
+    } catch {
       console.warn('Performance observer not supported')
     }
 
@@ -48,7 +48,7 @@ export function usePerformanceMonitoring() {
 
     try {
       lcpObserver.observe({ entryTypes: ['largest-contentful-paint'] })
-    } catch (e) {
+    } catch {
       console.warn('LCP observer not supported')
     }
 
@@ -66,7 +66,7 @@ export function usePerformanceMonitoring() {
 
     try {
       clsObserver.observe({ entryTypes: ['layout-shift'] })
-    } catch (e) {
+    } catch {
       console.warn('CLS observer not supported')
     }
 

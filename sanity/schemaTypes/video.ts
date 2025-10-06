@@ -44,20 +44,16 @@ export const video = defineType({
       validation: (Rule) => Rule.required()
     }),
     defineField({
-      name: 'thumbnail',
-      title: 'Thumbnail Image',
-      type: 'image',
-      description: 'Custom thumbnail (optional, will use video thumbnail if not set)',
-      options: {
-        hotspot: true
-      },
-      fields: [
-        {
-          name: 'alt',
-          type: 'string',
-          title: 'Alternative text'
-        }
-      ]
+      name: 'thumbnailUrl',
+      title: 'Thumbnail Image URL',
+      type: 'url',
+      description: 'Cloudinary thumbnail image URL (optional, will use video thumbnail if not set)'
+    }),
+    defineField({
+      name: 'thumbnailId',
+      title: 'Thumbnail Cloudinary ID',
+      type: 'string',
+      description: 'Cloudinary public ID for thumbnail transformations'
     }),
     defineField({
       name: 'description',
@@ -107,31 +103,85 @@ export const video = defineType({
       name: 'storyboard',
       title: 'Grabbed Stills / Storyboard',
       type: 'array',
-      description: 'Add key frames or grabbed stills from the video',
+      description: 'Key frames from the video. Use "Bulk Upload Storyboards" tool to upload multiple images at once.',
       of: [
         {
-          type: 'image',
-          options: {
-            hotspot: true
-          },
+          type: 'object',
+          name: 'storyboardFrame',
+          title: 'Storyboard Frame',
           fields: [
+            {
+              name: 'imageUrl',
+              type: 'url',
+              title: 'Cloudinary Image URL',
+              description: '🔗 Auto-filled by bulk upload',
+              validation: (Rule) => Rule.required(),
+              readOnly: true
+            },
+            {
+              name: 'imageId',
+              type: 'string',
+              title: 'Cloudinary Public ID',
+              description: '🔗 Auto-filled by bulk upload',
+              validation: (Rule) => Rule.required(),
+              readOnly: true
+            },
             {
               name: 'alt',
               type: 'string',
-              title: 'Alternative text',
-              description: 'Describe this frame/still'
+              title: 'Alternative Text',
+              description: '✏️ Describe what\'s in this frame (for accessibility)',
+              placeholder: 'e.g., "Wide shot of the ceremony"'
             },
             {
               name: 'caption',
-              type: 'string',
+              type: 'text',
               title: 'Caption',
-              description: 'Optional caption for this frame'
+              description: '✏️ Optional caption or notes for this frame',
+              rows: 2,
+              placeholder: 'Add a caption or note about this frame...'
+            },
+            {
+              name: 'timestamp',
+              type: 'string',
+              title: 'Timestamp',
+              description: '⏱️ Time in video (e.g., "1:23" or "00:01:23")',
+              placeholder: '00:01:23'
+            },
+            {
+              name: 'order',
+              type: 'number',
+              title: 'Display Order',
+              description: '🔢 Optional: Set custom order (lower numbers appear first)',
+              initialValue: 0
             }
-          ]
+          ],
+          preview: {
+            select: {
+              imageUrl: 'imageUrl',
+              imageId: 'imageId',
+              alt: 'alt',
+              caption: 'caption',
+              timestamp: 'timestamp',
+              order: 'order'
+            },
+            prepare({ imageUrl, imageId, alt, caption, timestamp, order }) {
+              return {
+                title: alt || caption || imageId || 'Storyboard frame',
+                subtitle: [
+                  timestamp && `⏱️ ${timestamp}`,
+                  caption && `📝 ${caption}`,
+                  order !== undefined && order !== 0 && `#${order}`
+                ].filter(Boolean).join(' • '),
+                media: imageUrl
+              }
+            }
+          }
         }
       ],
       options: {
-        layout: 'grid'
+        layout: 'grid',
+        sortable: true
       }
     }),
     defineField({

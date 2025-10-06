@@ -94,7 +94,7 @@ export function Portfolio({ collections, loading = false }: { collections: Colle
                   <div className="absolute inset-0 p-4 sm:p-6 flex flex-col justify-end md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
                     <h3
                       className="text-xl sm:text-2xl font-bold text-white mb-2 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300"
-                      style={{ fontFamily: 'var(--font-livvic), sans-serif' }}
+                      style={{ fontFamily: /[\u1780-\u17FF]/.test(collection.title) ? '"Kantumruy Pro", sans-serif' : 'var(--font-livvic), sans-serif' }}
                     >
                       {collection.title}
                     </h3>

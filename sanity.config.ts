@@ -13,6 +13,7 @@ import {apiVersion, dataset, projectId} from './sanity/env'
 import {schema} from './sanity/schemaTypes'
 import {structure} from './sanity/structure'
 import {bulkUploadPlugin} from './sanity/plugins/bulk-upload-plugin'
+import {videoUploadPlugin} from './sanity/plugins/video-upload-plugin'
 import {AutoCreateSubalbumsAction} from './sanity/actions/auto-create-subalbums-action'
 import {SafeDeleteAction} from './sanity/actions/safe-delete-action'
 
@@ -29,6 +30,8 @@ export default defineConfig({
     visionTool({defaultApiVersion: apiVersion}),
     // Bulk upload plugin for photos
     bulkUploadPlugin(),
+    // Video storyboard upload plugin
+    videoUploadPlugin(),
   ],
   document: {
     actions: (prev, context) => {
