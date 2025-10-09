@@ -8,12 +8,6 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'cdn.sanity.io',
-        port: '',
-        pathname: '/images/**',
-      },
-      {
-        protocol: 'https',
         hostname: 'res.cloudinary.com',
         port: '',
         pathname: '/**',
@@ -61,7 +55,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.sanity.io; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; connect-src 'self' https:; frame-src 'self' https://www.youtube.com https://player.vimeo.com https://drive.google.com; object-src 'none'; base-uri 'self'; form-action 'self';"
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; connect-src 'self' https:; frame-src 'self' https://www.youtube.com https://player.vimeo.com https://drive.google.com; object-src 'none'; base-uri 'self'; form-action 'self';"
           },
           {
             key: 'X-DNS-Prefetch-Control',

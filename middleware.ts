@@ -1,22 +1,24 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { updateSession } from '@/lib/supabase/middleware'
 
-export function middleware(request: NextRequest) {
-  const response = NextResponse.next()
+export async function middleware(request: NextRequest) {
+  // Handle Supabase auth
+  const supabaseResponse = await updateSession(request)
 
   // Add performance headers
-  response.headers.set('X-DNS-Prefetch-Control', 'on')
+  supabaseResponse.headers.set('X-DNS-Prefetch-Control', 'on')
 
   // Enable early hints for link prefetching
   const pathname = request.nextUrl.pathname
 
   if (pathname === '/') {
-    response.headers.set('Link', '</gallery>; rel=prefetch, </about>; rel=prefetch, </contact>; rel=prefetch')
+    supabaseResponse.headers.set('Link', '</gallery>; rel=prefetch, </about>; rel=prefetch, </contact>; rel=prefetch')
   } else if (pathname === '/gallery') {
-    response.headers.set('Link', '</collection>; rel=prefetch')
+    supabaseResponse.headers.set('Link', '</collection>; rel=prefetch')
   }
 
-  return response
+  return supabaseResponse
 }
 
 export const config = {

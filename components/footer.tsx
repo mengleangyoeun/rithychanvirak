@@ -7,7 +7,6 @@ import { siInstagram, siTelegram, siFacebook, siGmail, siLintcode } from 'simple
 import type { SimpleIcon } from 'simple-icons'
 import type { LucideIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { client } from '@/sanity/lib/client'
 
 interface ContactData {
   socialLinks?: Array<{
@@ -41,11 +40,36 @@ const colorMap: { [key: string]: string } = {
 }
 
 async function getContactData() {
-  return client.fetch(`
-    *[_type == "contact"][0] {
-      socialLinks
-    }
-  `)
+  // Static contact data since we removed Sanity
+  return {
+    socialLinks: [
+      {
+        platform: 'Contact',
+        url: '+855-12-345-678',
+        icon: 'Phone'
+      },
+      {
+        platform: 'Gmail',
+        url: 'mailto:hello@rithychanvirak.com',
+        icon: 'Gmail'
+      },
+      {
+        platform: 'Instagram',
+        url: 'https://instagram.com/rithychanvirak',
+        icon: 'Instagram'
+      },
+      {
+        platform: 'Facebook',
+        url: 'https://facebook.com/rithychanvirak',
+        icon: 'Facebook'
+      },
+      {
+        platform: 'Telegram',
+        url: 'https://t.me/rithychanvirak',
+        icon: 'Telegram'
+      }
+    ]
+  }
 }
 
 export function Footer() {

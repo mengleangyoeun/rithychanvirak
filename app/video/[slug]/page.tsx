@@ -1,37 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { client } from '@/sanity/lib/client'
+import { useState, useEffect, useCallback } from 'react'
 import { getThumbnailUrl } from '@/lib/cloudinary'
 import Image from 'next/image'
 import Link from 'next/link'
 import { motion } from 'motion/react'
-import { ArrowLeft, Calendar, Tag, Camera } from 'lucide-react'
+import { ArrowLeft, Calendar, Tag } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import type { Video, VideoStoryboard } from '@/types/database'
 
-interface StoryboardImage {
-  imageUrl: string
-  imageId: string
-  alt?: string
-  caption?: string
-}
-
-interface Video {
-  _id: string
-  title: string
-  slug: { current: string }
-  videoUrl: string
-  videoType: 'youtube' | 'vimeo' | 'googledrive' | 'direct'
-  thumbnailUrl?: string
-  thumbnailId?: string
-  description?: string
-  category?: string
-  year?: number
-  tags?: string[]
-  storyboard?: StoryboardImage[]
+interface VideoWithStoryboard extends Video {
+  storyboard: VideoStoryboard[]
 }
 
 export default function VideoPage({ params }: { params: Promise<{ slug: string }> }) {
-  const [video, setVideo] = useState<Video | null>(null)
+  const supabase = createClient()
+  const [video, setVideo] = useState<VideoWithStoryboard | null>(null)
   const [relatedVideos, setRelatedVideos] = useState<Video[]>([])
   const [loading, setLoading] = useState(true)
   const [slug, setSlug] = useState<string>('')
@@ -42,60 +26,58 @@ export default function VideoPage({ params }: { params: Promise<{ slug: string }
     params.then((p) => setSlug(p.slug))
   }, [params])
 
+  const fetchVideo = useCallback(async () => {
+    try {
+      setLoading(true)
+
+      // Fetch video with storyboard images
+      const { data: videoData, error: videoError } = await supabase
+        .from('videos')
+        .select(`
+          *,
+          storyboard:video_storyboard(*)
+        `)
+        .eq('slug', slug)
+        .eq('is_active', true)
+        .single()
+
+      if (videoError || !videoData) {
+        console.error('Video not found:', videoError)
+        setVideo(null)
+        setRelatedVideos([])
+        return
+      }
+
+      setVideo(videoData as VideoWithStoryboard)
+
+      // Fetch related videos (same category, different video, active only)
+      if (videoData.category) {
+        const { data: relatedData } = await supabase
+          .from('videos')
+          .select('*')
+          .eq('category', videoData.category)
+          .neq('id', videoData.id)
+          .eq('is_active', true)
+          .limit(3)
+
+        setRelatedVideos(relatedData || [])
+      } else {
+        setRelatedVideos([])
+      }
+    } catch (error) {
+      console.error('Error fetching video:', error)
+      setVideo(null)
+      setRelatedVideos([])
+    } finally {
+      setLoading(false)
+    }
+  }, [slug, supabase])
+
   useEffect(() => {
     if (!slug) return
 
-    async function fetchVideo() {
-      try {
-        const videoData = await client.fetch(
-          `*[_type == "video" && slug.current == $slug][0] {
-            _id,
-            title,
-            slug,
-            videoUrl,
-            videoType,
-            thumbnailUrl,
-            thumbnailId,
-            description,
-            category,
-            year,
-            tags,
-            storyboard
-          }`,
-          { slug }
-        )
-
-        if (videoData) {
-          setVideo(videoData)
-
-          // Fetch related videos
-          const related = await client.fetch(
-            `*[_type == "video" && category == $category && slug.current != $slug] | order(_createdAt desc)[0...3] {
-              _id,
-              title,
-              slug,
-              videoUrl,
-              videoType,
-              thumbnailUrl,
-              thumbnailId,
-              category,
-              year
-            }`,
-            { category: videoData.category, slug }
-          )
-
-          setRelatedVideos(related || [])
-        }
-
-        setLoading(false)
-      } catch (error) {
-        console.error('Error fetching video:', error)
-        setLoading(false)
-      }
-    }
-
     fetchVideo()
-  }, [slug])
+  }, [slug, fetchVideo])
 
   useEffect(() => {
     if (!video?.storyboard) return
@@ -107,49 +89,63 @@ export default function VideoPage({ params }: { params: Promise<{ slug: string }
       img.onload = () => {
         setAspectRatios(prev => ({ ...prev, [index]: img.naturalWidth / img.naturalHeight }))
       }
-      img.src = getThumbnailUrl(still.imageId, 600)
+      // Use image_id if available, otherwise extract from image_url
+      const imageId = still.image_id || (still.image_url.includes('cloudinary')
+        ? (() => {
+            const urlParts = still.image_url.split('/upload/')
+            if (urlParts.length > 1) {
+              const afterUpload = urlParts[1]
+              // Remove version prefix if present (v123/) and file extension
+              const withoutVersion = afterUpload.replace(/^v\d+\//, '')
+              return withoutVersion.split('.').slice(0, -1).join('.')
+            }
+            return ''
+          })()
+        : still.image_url)
+      img.src = getThumbnailUrl(imageId, 600)
     })
   }, [video?.storyboard, aspectRatios])
 
-  const getEmbedUrl = (video: Video) => {
-    if (video.videoType === 'youtube') {
-      const videoId = video.videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/)?.[1]
+  const getEmbedUrl = (video: VideoWithStoryboard) => {
+    if (video.video_type === 'youtube') {
+      const videoId = video.video_url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/)?.[1]
       return `https://www.youtube.com/embed/${videoId}`
-    } else if (video.videoType === 'vimeo') {
-      const videoId = video.videoUrl.match(/vimeo\.com\/(\d+)/)?.[1]
+    } else if (video.video_type === 'vimeo') {
+      const videoId = video.video_url.match(/vimeo\.com\/(\d+)/)?.[1]
       return `https://player.vimeo.com/video/${videoId}`
-    } else if (video.videoType === 'googledrive') {
+    } else if (video.video_type === 'googledrive') {
       // Extract file ID from Google Drive URL
       // Supports: https://drive.google.com/file/d/FILE_ID/view
       // or: https://drive.google.com/open?id=FILE_ID
-      const fileIdMatch = video.videoUrl.match(/\/d\/([^/]+)/) || video.videoUrl.match(/[?&]id=([^&]+)/)
+      const fileIdMatch = video.video_url.match(/\/d\/([^/]+)/) || video.video_url.match(/[?&]id=([^&]+)/)
       const fileId = fileIdMatch?.[1]
       if (fileId) {
         return `https://drive.google.com/file/d/${fileId}/preview`
       }
     }
-    return video.videoUrl
+    return video.video_url
   }
 
   const getVideoThumbnail = (vid: Video) => {
-    // Use Cloudinary thumbnail if available
-    if (vid.thumbnailId) {
-      return getThumbnailUrl(vid.thumbnailId, 400)
+    // 1. Check for custom thumbnail URL (Google Drive, Imgur, etc.)
+    if (vid.thumbnail_url) {
+      return vid.thumbnail_url
     }
 
-    // Fallback to video platform thumbnails
-    if (vid.videoType === 'youtube') {
-      const videoId = vid.videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/)?.[1]
+    // 2. Fall back to video platform thumbnails
+    if (vid.video_type === 'youtube') {
+      const videoId = vid.video_url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/)?.[1]
       if (videoId) {
         return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
       }
-    } else if (vid.videoType === 'vimeo') {
-      const videoId = vid.videoUrl.match(/vimeo\.com\/(\d+)/)?.[1]
+    } else if (vid.video_type === 'vimeo') {
+      const videoId = vid.video_url.match(/vimeo\.com\/(\d+)/)?.[1]
       if (videoId) {
         return `https://vumbnail.com/${videoId}.jpg`
       }
     }
 
+    // 3. Placeholder if nothing else works
     return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="225"%3E%3Crect width="400" height="225" fill="%23111827"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="system-ui" font-size="16" fill="%23ffffff40"%3ENo Thumbnail%3C/text%3E%3C/svg%3E'
   }
 
@@ -284,7 +280,7 @@ export default function VideoPage({ params }: { params: Promise<{ slug: string }
                       This video cannot be embedded. Please watch it directly on the platform.
                     </p>
                     <a
-                      href={video.videoUrl}
+                      href={video.video_url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
@@ -292,7 +288,7 @@ export default function VideoPage({ params }: { params: Promise<{ slug: string }
                       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
                       </svg>
-                      Watch on {video.videoType === 'youtube' ? 'YouTube' : video.videoType === 'vimeo' ? 'Vimeo' : 'Platform'}
+                      Watch on {video.video_type === 'youtube' ? 'YouTube' : video.video_type === 'vimeo' ? 'Vimeo' : 'Platform'}
                     </a>
                   </div>
                 </div>
@@ -332,7 +328,16 @@ export default function VideoPage({ params }: { params: Promise<{ slug: string }
             >
               {/* Header with just camera icon */}
               <div className="flex items-center justify-center mb-8">
-                <Camera className="w-8 h-8 text-white" />
+                <svg
+                  className="w-6 h-6 text-white"
+                  style={{ imageRendering: 'crisp-edges', shapeRendering: 'crispEdges' }}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -347,7 +352,18 @@ export default function VideoPage({ params }: { params: Promise<{ slug: string }
                   >
                     <div className="relative overflow-hidden rounded-xl bg-white/5 border border-white/10" style={{ aspectRatio: aspectRatios[index] || 16/9 }}>
                       <Image
-                        src={getThumbnailUrl(still.imageId, 600)}
+                        src={getThumbnailUrl(still.image_id || (still.image_url.includes('cloudinary')
+                          ? (() => {
+                              const urlParts = still.image_url.split('/upload/')
+                              if (urlParts.length > 1) {
+                                const afterUpload = urlParts[1]
+                                // Remove version prefix if present (v123/) and file extension
+                                const withoutVersion = afterUpload.replace(/^v\d+\//, '')
+                                return withoutVersion.split('.').slice(0, -1).join('.')
+                              }
+                              return ''
+                            })()
+                          : still.image_url), 600)}
                         alt={still.alt || `Frame ${index + 1}`}
                         fill
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
@@ -387,8 +403,8 @@ export default function VideoPage({ params }: { params: Promise<{ slug: string }
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {relatedVideos.map((relatedVideo) => (
                   <Link
-                    key={relatedVideo._id}
-                    href={`/video/${relatedVideo.slug.current}`}
+                    key={relatedVideo.id}
+                    href={`/video/${relatedVideo.slug}`}
                     className="group"
                   >
                     <div className="relative aspect-video overflow-hidden rounded-xl bg-white/5 border border-white/10 hover:border-white/20 transition-all">

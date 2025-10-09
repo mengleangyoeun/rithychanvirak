@@ -14,7 +14,9 @@ export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
 
+  // Built-in navigation - core site structure
   const navLinks = [
+    { href: "/", label: "Home" },
     { href: "/gallery", label: "Gallery" },
     { href: "/videos", label: "Videos" },
     { href: "/about", label: "About" },
@@ -126,49 +128,49 @@ export function Header() {
 
           {/* Mobile Menu */}
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-            <SheetTrigger asChild className="md:hidden">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-white hover:bg-white/10 transition-colors"
-                aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+              <SheetTrigger asChild className="md:hidden">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-white hover:bg-white/10 transition-colors"
+                  aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+                >
+                  {isMobileMenuOpen ? (
+                    <X className="h-6 w-6" />
+                  ) : (
+                    <Menu className="h-6 w-6" />
+                  )}
+                </Button>
+              </SheetTrigger>
+              <SheetContent
+                side="right"
+                className="bg-black/95 backdrop-blur-xl border-l border-white/10 w-[280px] sm:w-[320px]"
               >
-                {isMobileMenuOpen ? (
-                  <X className="h-6 w-6" />
-                ) : (
-                  <Menu className="h-6 w-6" />
-                )}
-              </Button>
-            </SheetTrigger>
-            <SheetContent
-              side="right"
-              className="bg-black/95 backdrop-blur-xl border-l border-white/10 w-[280px] sm:w-[320px]"
-            >
-              <VisuallyHidden>
-                <SheetTitle>Navigation Menu</SheetTitle>
-              </VisuallyHidden>
-              <nav className="flex flex-col gap-6 mt-16">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    prefetch={true}
-                    onClick={closeMobileMenu}
-                    className={cn(
-                      "text-lg font-medium transition-[color,padding-left] duration-300 ease-out py-2",
-                      pathname === link.href
-                        ? "text-white border-l-2 border-white pl-4"
-                        : "text-white/70 hover:text-white pl-4 hover:pl-6"
-                    )}
-                    style={{ fontFamily: "var(--font-livvic), sans-serif" }}
-                    aria-current={pathname === link.href ? "page" : undefined}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </nav>
-            </SheetContent>
-          </Sheet>
+                <VisuallyHidden>
+                  <SheetTitle>Navigation Menu</SheetTitle>
+                </VisuallyHidden>
+                <nav className="flex flex-col gap-6 mt-16">
+                  {navLinks.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      prefetch={true}
+                      onClick={closeMobileMenu}
+                      className={cn(
+                        "text-lg font-medium transition-[color,padding-left] duration-300 ease-out py-2",
+                        pathname === link.href
+                          ? "text-white border-l-2 border-white pl-4"
+                          : "text-white/70 hover:text-white pl-4 hover:pl-6"
+                      )}
+                      style={{ fontFamily: "var(--font-livvic), sans-serif" }}
+                      aria-current={pathname === link.href ? "page" : undefined}
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </nav>
+              </SheetContent>
+            </Sheet>
         </nav>
       </div>
     </header>

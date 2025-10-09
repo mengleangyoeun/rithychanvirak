@@ -1,8 +1,6 @@
 'use client'
 
 import { motion } from 'motion/react'
-import Image from 'next/image'
-import { urlFor } from '@/sanity/lib/image'
 import { ChevronDown } from 'lucide-react'
 
 interface HeroData {
@@ -14,47 +12,19 @@ interface HeroData {
 }
 
 export function Hero({ data }: { data: HeroData | null }) {
-  const overlayOpacity = data?.overlayOpacity || 0.5
 
   return (
     <section className="relative h-screen w-full flex items-start md:items-center justify-center overflow-hidden pt-24 md:pt-0">
       {/* Background with parallax effect */}
       <div className="absolute inset-0">
-        {data?.backgroundImage ? (
-          <>
-            <motion.div
-              initial={{ scale: 1.1 }}
-              animate={{ scale: 1 }}
-              transition={{ duration: 1.5, ease: "easeOut" }}
-              className="w-full h-full"
-            >
-              {/* Mobile Image - Portrait crop */}
-              <Image
-                src={urlFor(data.backgroundImage).width(800).height(1200).fit('crop').crop('focalpoint').url()}
-                alt={data.backgroundImage.alt || 'Hero background'}
-                fill
-                sizes="100vw"
-                className="object-cover md:hidden"
-                style={{ objectPosition: '95% center' }}
-                priority
-                quality={90}
-              />
-              {/* Desktop Image - Landscape crop */}
-              <Image
-                src={urlFor(data.backgroundImage).width(2000).height(1200).fit('crop').crop('focalpoint').url()}
-                alt={data.backgroundImage.alt || 'Hero background'}
-                fill
-                sizes="100vw"
-                className="object-cover hidden md:block"
-                priority
-                quality={90}
-              />
-            </motion.div>
-            <div
-              className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/40 to-black/70"
-              style={{ opacity: overlayOpacity }}
-            />
-          </>
+        {data?.backgroundImage?.asset?._ref ? (
+          <div
+            className="w-full h-full bg-cover bg-[75%_center] md:bg-center bg-no-repeat"
+            style={{
+              backgroundImage: `url(${data.backgroundImage.asset._ref})`,
+              imageRendering: 'auto'
+            }}
+          />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-amber-900 via-orange-900 to-black" />
         )}

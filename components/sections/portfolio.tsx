@@ -3,51 +3,48 @@
 import { motion } from 'motion/react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { urlFor } from '@/sanity/lib/image'
 import { CollectionCardSkeletonPortfolio } from '@/components/collection-card-skeleton'
+import type { Collection } from '@/types/database'
 
-interface Collection {
-  _id: string
-  title: string
-  slug: { current: string }
-  description?: string
-  coverImage?: { asset: { _ref: string }; alt?: string }
+interface CollectionWithStats extends Collection {
   totalPhotos: number
   subAlbums: number
 }
 
-export function Portfolio({ collections, loading = false }: { collections: Collection[], loading?: boolean }) {
+export function Portfolio({ collections, loading = false, showTitle = true }: { collections: CollectionWithStats[], loading?: boolean, showTitle?: boolean }) {
   if (!loading && (!collections || collections.length === 0)) return null
 
   return (
     <section className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6 overflow-hidden">
       <div className="relative max-w-7xl mx-auto">
-        {/* Section Title */}
-        <div className="text-center mb-12 sm:mb-16 md:mb-20">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            viewport={{ once: true, margin: "-100px" }}
-          >
-            <h2
-              className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-[0.08em] sm:tracking-[0.1em] uppercase mb-4 sm:mb-6 px-4"
-              style={{ fontFamily: 'var(--font-livvic), sans-serif' }}
-            >
-              Portfolio
-            </h2>
+        {/* Section Title - conditionally shown */}
+        {showTitle && (
+          <div className="text-center mb-12 sm:mb-16 md:mb-20">
             <motion.div
-              className="w-16 sm:w-24 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full mx-auto mb-4 sm:mb-6"
-              initial={{ width: 0 }}
-              whileInView={{ width: 96 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              viewport={{ once: true }}
-            />
-            <p className="text-white/70 text-sm sm:text-base md:text-lg lg:text-xl max-w-3xl mx-auto leading-relaxed px-4">
-              Explore curated collections showcasing diverse photography styles and unforgettable moments
-            </p>
-          </motion.div>
-        </div>
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+              viewport={{ once: true, margin: "-100px" }}
+            >
+              <h2
+                className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-[0.08em] sm:tracking-[0.1em] uppercase mb-4 sm:mb-6 px-4"
+                style={{ fontFamily: 'var(--font-livvic), sans-serif' }}
+              >
+                Albums
+              </h2>
+              <motion.div
+                className="w-16 sm:w-24 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full mx-auto mb-4 sm:mb-6"
+                initial={{ width: 0 }}
+                whileInView={{ width: 96 }}
+                transition={{ duration: 0.8, delay: 0.2 }}
+                viewport={{ once: true }}
+              />
+              <p className="text-white/70 text-sm sm:text-base md:text-lg lg:text-xl max-w-3xl mx-auto leading-relaxed px-4">
+                Explore curated albums showcasing diverse photography styles and unforgettable moments
+              </p>
+            </motion.div>
+          </div>
+        )}
 
         {/* Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10 max-w-6xl mx-auto">
@@ -67,7 +64,7 @@ export function Portfolio({ collections, loading = false }: { collections: Colle
           ) : (
             collections.map((collection, index) => (
             <motion.div
-              key={collection._id}
+              key={collection.id}
               initial={{ opacity: 0, y: 50 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: index * 0.1 }}
@@ -75,12 +72,12 @@ export function Portfolio({ collections, loading = false }: { collections: Colle
               className="relative group cursor-pointer h-80 sm:h-96 overflow-hidden rounded-2xl sm:rounded-3xl bg-white/5 backdrop-blur-sm border border-white/10"
               whileHover={{ y: -12, scale: 1.02 }}
             >
-              <Link href={`/collection/${collection.slug.current}`} className="block h-full">
+              <Link href={`/collection/${collection.slug}`} className="block h-full">
                 <div className="h-full relative overflow-hidden rounded-3xl">
-                  {collection.coverImage && (
+                  {collection.cover_image_url && (
                     <Image
-                      src={urlFor(collection.coverImage).width(600).height(500).url()}
-                      alt={collection.coverImage.alt || collection.title}
+                      src={collection.cover_image_url}
+                      alt={collection.title}
                       fill
                       sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                       className="object-cover group-hover:scale-110 transition-transform duration-700 ease-out"

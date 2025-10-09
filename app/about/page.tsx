@@ -1,26 +1,14 @@
 'use client'
 
-import { client } from '@/sanity/lib/client'
-import { urlFor } from '@/sanity/lib/image'
-import { PortableText } from '@portabletext/react'
 import Image from 'next/image'
 import { Award, Camera, ArrowRight } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState, useEffect } from 'react'
 import { CSSProperties } from 'react'
-// Removed unused UI component imports
 import { Skeleton } from '@/components/ui/skeleton'
+import { createClient } from '@/lib/supabase/client'
 
-// TypeScript interfaces based on Sanity query structure
-interface SanityImage {
-  _type: 'image'
-  asset: {
-    _ref: string
-    _type: 'reference'
-  }
-  alt?: string
-}
-
+// TypeScript interfaces for about page data
 interface Experience {
   title: string
   organization: string
@@ -47,30 +35,85 @@ interface Skill {
 
 interface AboutData {
   title?: string
-  profileImage?: SanityImage
   name?: string
   tagline?: string
-  bio?: Array<{ _type: string; [key: string]: unknown }> // PortableText content
+  bio?: string
+  profile_image_url?: string
   experience?: Experience[]
   skills?: Skill[]
   awards?: Award[]
   equipment?: EquipmentCategory[]
 }
 
-async function getAboutData() {
-  return client.fetch(`
-    *[_type == "about"][0] {
-      title,
-      profileImage,
-      name,
-      tagline,
-      bio,
-      experience,
-      skills,
-      awards,
-      equipment
+async function getAboutData(): Promise<AboutData | null> {
+  try {
+    const supabase = createClient()
+
+    // Fetch main about content
+    const { data: aboutContent, error: aboutError } = await supabase
+      .from('about_content')
+      .select('*')
+      .eq('is_active', true)
+      .single()
+
+    if (aboutError || !aboutContent) {
+      console.error('Error fetching about content:', aboutError)
+      return null
     }
-  `)
+
+    // Fetch related data
+    const [experienceRes, skillsRes, awardsRes, equipmentCategoriesRes] = await Promise.all([
+      supabase.from('about_experience').select('*').eq('about_content_id', aboutContent.id).order('order'),
+      supabase.from('about_skills').select('*').eq('about_content_id', aboutContent.id).order('order'),
+      supabase.from('about_awards').select('*').eq('about_content_id', aboutContent.id).order('order'),
+      supabase.from('about_equipment_categories').select('*').eq('about_content_id', aboutContent.id).order('order')
+    ])
+
+    // Fetch equipment items for each category
+    const equipmentCategories = equipmentCategoriesRes.data || []
+    const equipmentWithItems = await Promise.all(
+      equipmentCategories.map(async (category) => {
+        const { data: items } = await supabase
+          .from('about_equipment_items')
+          .select('*')
+          .eq('equipment_category_id', category.id)
+          .order('order')
+
+        return {
+          category: category.category,
+          items: items?.map(item => item.item) || []
+        }
+      })
+    )
+
+    return {
+      title: aboutContent.title,
+      name: aboutContent.name,
+      tagline: aboutContent.tagline,
+      bio: aboutContent.bio,
+      profile_image_url: aboutContent.profile_image_url,
+      experience: experienceRes.data?.map(exp => ({
+        title: exp.title,
+        organization: exp.organization,
+        period: exp.period,
+        description: exp.description
+      })) || [],
+      skills: skillsRes.data?.map(skill => ({
+        _key: skill.id,
+        name: skill.name,
+        icon: skill.icon
+      })) || [],
+      awards: awardsRes.data?.map(award => ({
+        title: award.title,
+        organization: award.organization,
+        year: award.year
+      })) || [],
+      equipment: equipmentWithItems
+    }
+  } catch (error) {
+    console.error('Error fetching about data:', error)
+    return null
+  }
 }
 
 export default function AboutPage() {
@@ -131,122 +174,103 @@ export default function AboutPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 xl:gap-20 items-center">
             
             {/* Modern Profile Image */}
-            <motion.div 
+            <motion.div
               {...fadeInUp}
               className="relative order-2 lg:order-1"
             >
-              {aboutData.profileImage && (
-                <div className="relative w-80 h-80 lg:w-96 lg:h-96 xl:w-[30rem] xl:h-[30rem] mx-auto">
+              <div className="relative w-80 h-80 lg:w-96 lg:h-96 xl:w-[30rem] xl:h-[30rem] mx-auto">
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 1, ease: "easeOut" }}
+                  className="relative w-full h-full group"
+                >
+                  {/* Modern geometric frame */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 via-purple-500/10 to-cyan-500/20 rounded-3xl blur-xl"></div>
+                  <div className="absolute -inset-2 bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-cyan-500/30 rounded-3xl blur-2xl opacity-30 group-hover:opacity-50 transition-opacity duration-700"></div>
+
+                  {/* Floating geometric shapes */}
                   <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ duration: 1, ease: "easeOut" }}
-                    className="relative w-full h-full group"
+                    animate={{
+                      rotate: [0, 360],
+                      scale: [1, 1.1, 1]
+                    }}
+                    transition={{
+                      duration: 20,
+                      repeat: Infinity,
+                      ease: "linear"
+                    }}
+                    className="absolute -top-8 -right-8 w-16 h-16 border-2 border-blue-400/60 rounded-2xl rotate-12 z-10"
+                  />
+
+                  <motion.div
+                    animate={{
+                      rotate: [360, 0],
+                      y: [0, -10, 0]
+                    }}
+                    transition={{
+                      duration: 15,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                    className="absolute -bottom-6 -left-6 w-12 h-12 bg-gradient-to-br from-purple-400 to-cyan-400 rounded-full opacity-80 z-10"
+                  />
+
+                  <motion.div
+                    animate={{
+                      rotate: [0, -90, 0],
+                      scale: [1, 1.2, 1]
+                    }}
+                    transition={{
+                      duration: 12,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                    className="absolute top-8 -left-4 w-8 h-8 border-2 border-cyan-400/60 rotate-45 z-10"
+                  />
+
+                  {/* Modern camera icon */}
+                  <motion.div
+                    animate={{
+                      rotate: [0, 5, -5, 0],
+                      y: [0, -5, 0]
+                    }}
+                    transition={{
+                      duration: 4,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                    className="absolute -top-6 right-8 w-14 h-14 bg-card/80 backdrop-blur-xl border border-foreground/20 rounded-2xl flex items-center justify-center z-20 shadow-2xl group-hover:shadow-blue-500/20 transition-shadow duration-500"
                   >
-                    {/* Modern geometric frame */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 via-purple-500/10 to-cyan-500/20 rounded-3xl blur-xl"></div>
-                    <div className="absolute -inset-2 bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-cyan-500/30 rounded-3xl blur-2xl opacity-30 group-hover:opacity-50 transition-opacity duration-700"></div>
-                    
-                    {/* Floating geometric shapes */}
-                    <motion.div
-                      animate={{ 
-                        rotate: [0, 360],
-                        scale: [1, 1.1, 1]
-                      }}
-                      transition={{ 
-                        duration: 20, 
-                        repeat: Infinity,
-                        ease: "linear"
-                      }}
-                      className="absolute -top-8 -right-8 w-16 h-16 border-2 border-blue-400/60 rounded-2xl rotate-12 z-10"
-                    />
-                    
-                    <motion.div
-                      animate={{ 
-                        rotate: [360, 0],
-                        y: [0, -10, 0]
-                      }}
-                      transition={{ 
-                        duration: 15, 
-                        repeat: Infinity,
-                        ease: "easeInOut"
-                      }}
-                      className="absolute -bottom-6 -left-6 w-12 h-12 bg-gradient-to-br from-purple-400 to-cyan-400 rounded-full opacity-80 z-10"
-                    />
-                    
-                    <motion.div
-                      animate={{ 
-                        rotate: [0, -90, 0],
-                        scale: [1, 1.2, 1]
-                      }}
-                      transition={{ 
-                        duration: 12, 
-                        repeat: Infinity,
-                        ease: "easeInOut"
-                      }}
-                      className="absolute top-8 -left-4 w-8 h-8 border-2 border-cyan-400/60 rotate-45 z-10"
-                    />
-                    
-                    {/* Modern camera icon */}
-                    <motion.div
-                      animate={{ 
-                        rotate: [0, 5, -5, 0],
-                        y: [0, -5, 0]
-                      }}
-                      transition={{ 
-                        duration: 4, 
-                        repeat: Infinity,
-                        ease: "easeInOut"
-                      }}
-                      className="absolute -top-6 right-8 w-14 h-14 bg-card/80 backdrop-blur-xl border border-foreground/20 rounded-2xl flex items-center justify-center z-20 shadow-2xl group-hover:shadow-blue-500/20 transition-shadow duration-500"
-                    >
-                      <Camera className="w-7 h-7 text-blue-400" />
-                    </motion.div>
-                    
-                    {/* Modern Image container */}
-                    <motion.div
-                      whileHover={{ scale: 1.05 }}
-                      transition={{ duration: 0.5, ease: "easeOut" }}
-                      className="relative w-full h-full overflow-hidden rounded-3xl shadow-2xl group-hover:shadow-blue-500/20 transition-all duration-700"
-                    >
-                      {/* Inner glow effect */}
-                      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-purple-500/5 rounded-3xl"></div>
-                      
-                      <Image
-                        src={urlFor(aboutData.profileImage).width(600).height(600).url()}
-                        alt={aboutData.profileImage.alt || aboutData.name || 'Profile photo'}
-                        fill
-                        className="object-cover transition-transform duration-700 group-hover:scale-110"
-                        priority
-                      />
-                      
-                      {/* Modern gradient overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-blue-500/5 rounded-3xl"></div>
-                      
-                      {/* Subtle shine effect */}
-                      <motion.div
-                        animate={{ 
-                          x: ['-100%', '100%'],
-                          opacity: [0, 0.3, 0]
-                        }}
-                        transition={{ 
-                          duration: 3, 
-                          repeat: Infinity,
-                          repeatDelay: 2,
-                          ease: "easeInOut"
-                        }}
-                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent rounded-3xl -skew-x-12"
-                      />
-                    </motion.div>
-                    
-                    {/* Decorative corner elements */}
-                    <div className="absolute top-4 left-4 w-6 h-6 border-l-2 border-t-2 border-blue-400/60 rounded-tl-lg"></div>
-                    <div className="absolute top-4 right-4 w-6 h-6 border-r-2 border-t-2 border-purple-400/60 rounded-tr-lg"></div>
-                    <div className="absolute bottom-4 left-4 w-6 h-6 border-l-2 border-b-2 border-cyan-400/60 rounded-bl-lg"></div>
-                    <div className="absolute bottom-4 right-4 w-6 h-6 border-r-2 border-b-2 border-blue-400/60 rounded-br-lg"></div>
+                    <Camera className="w-7 h-7 text-blue-400" />
                   </motion.div>
-                </div>
-              )}
+
+                  {/* Profile image */}
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    className="relative w-full h-full overflow-hidden rounded-3xl shadow-2xl group-hover:shadow-blue-500/20 transition-all duration-700 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center"
+                  >
+                    {aboutData.profile_image_url ? (
+                      <Image
+                        src={aboutData.profile_image_url}
+                        alt={`${aboutData.name} profile`}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <Camera className="w-24 h-24 text-blue-400" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-blue-500/5 rounded-3xl"></div>
+                  </motion.div>
+
+                  {/* Decorative corner elements */}
+                  <div className="absolute top-4 left-4 w-6 h-6 border-l-2 border-t-2 border-blue-400/60 rounded-tl-lg"></div>
+                  <div className="absolute top-4 right-4 w-6 h-6 border-r-2 border-t-2 border-purple-400/60 rounded-tr-lg"></div>
+                  <div className="absolute bottom-4 left-4 w-6 h-6 border-l-2 border-b-2 border-cyan-400/60 rounded-bl-lg"></div>
+                  <div className="absolute bottom-4 right-4 w-6 h-6 border-r-2 border-b-2 border-blue-400/60 rounded-br-lg"></div>
+                </motion.div>
+              </div>
             </motion.div>
 
             {/* Enhanced Bio Content */}
@@ -284,16 +308,16 @@ export default function AboutPage() {
               )}
               
               {aboutData.bio && (
-                <motion.div 
+                <motion.div
                   {...fadeInUp}
                   transition={{ delay: 0.5 }}
                   className="prose prose-lg prose-invert max-w-none leading-relaxed text-foreground/75"
-                  style={{ 
+                  style={{
                     '--tw-prose-body': 'rgba(255, 255, 255, 0.75)',
                     '--tw-prose-headings': 'rgb(var(--foreground))',
                   } as CSSProperties & { [key: string]: string }}
                 >
-                  <PortableText value={aboutData.bio} />
+                  <p>{aboutData.bio}</p>
                 </motion.div>
               )}
 

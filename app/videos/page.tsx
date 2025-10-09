@@ -1,8 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { client } from '@/sanity/lib/client'
-import { urlFor } from '@/sanity/lib/image'
 import Image from 'next/image'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'motion/react'
@@ -17,6 +15,7 @@ interface Video {
   videoUrl: string
   videoType: 'youtube' | 'vimeo' | 'googledrive' | 'direct'
   thumbnail?: { asset: { _ref: string }; alt?: string }
+  thumbnailUrl?: string
   description?: string
   category?: string
   year?: number
@@ -28,14 +27,12 @@ function VideoCard({ video, index, viewMode }: { video: Video; index: number; vi
   const [embedError, setEmbedError] = useState(false)
 
   const getVideoThumbnail = (vid: Video) => {
-    if (vid.thumbnail?.asset?._ref) {
-      try {
-        return urlFor(vid.thumbnail).width(800).height(450).url()
-      } catch (error) {
-        console.error('Error generating thumbnail URL:', error)
-      }
+    // 1. Check for custom thumbnail URL
+    if (vid.thumbnailUrl) {
+      return vid.thumbnailUrl
     }
 
+    // 2. Fall back to video platform thumbnails
     if (vid.videoType === 'youtube') {
       const videoId = vid.videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/)?.[1]
       if (videoId) {
@@ -48,6 +45,7 @@ function VideoCard({ video, index, viewMode }: { video: Video; index: number; vi
       }
     }
 
+    // 3. Placeholder if nothing else works
     return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect width="800" height="450" fill="%23111827"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="system-ui" font-size="24" fill="%23ffffff40"%3ENo Thumbnail%3C/text%3E%3C/svg%3E'
   }
 
@@ -124,40 +122,16 @@ function VideoCard({ video, index, viewMode }: { video: Video; index: number; vi
                     allow="autoplay; muted"
                     style={{ border: 'none' }}
                     onError={() => setEmbedError(true)}
-                    onLoad={() => {
-                      // Reset error state on successful load
-                      setEmbedError(false)
-                      // Check for blocked content
-                      setTimeout(() => {
-                        try {
-                          const iframe = document.querySelector(`iframe[src*="${video.videoType}"]`) as HTMLIFrameElement
-                          if (iframe) {
-                            const checkContent = () => {
-                              try {
-                                const doc = iframe.contentDocument || iframe.contentWindow?.document
-                                if (doc && doc.body && doc.body.textContent?.includes('blocked')) {
-                                  setEmbedError(true)
-                                }
-                              } catch {
-                                // Cross-origin error, assume it's working
-                              }
-                            }
-                            setTimeout(checkContent, 1000)
-                          }
-                        } catch {
-                          // Ignore cross-origin errors
-                        }
-                      }, 500)
-                    }}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-black/80">
-                    <div className="text-center p-4">
-                      <svg className="w-8 h-8 mx-auto mb-2 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                      </svg>
-                      <p className="text-xs text-white/70">Preview unavailable</p>
-                    </div>
+                    <Image
+                      src={getVideoThumbnail(video)}
+                      alt={video.thumbnail?.alt || video.title}
+                      fill
+                      sizes={viewMode === 'grid' ? '(max-width: 768px) 100vw, 50vw' : '100vw'}
+                      className="object-cover opacity-50"
+                    />
                   </div>
                 )}
               </motion.div>
@@ -233,28 +207,65 @@ export default function VideosPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function fetchVideos() {
+    const fetchVideos = async () => {
       try {
-        const videosData = await client.fetch(`
-          *[_type == "video"] | order(order asc, year desc) {
-            _id,
-            title,
-            slug,
-            videoUrl,
-            videoType,
-            thumbnail,
-            description,
-            category,
-            year,
-            tags
-          }
-        `)
+        const { createClient } = await import('@/lib/supabase/client')
+        const supabase = createClient()
 
-        setVideos(videosData || [])
-        setFilteredVideos(videosData || [])
-        setLoading(false)
+        const { data: videosData, error } = await supabase
+          .from('videos')
+          .select('*')
+          .eq('is_active', true)
+          .order('order', { ascending: true })
+
+        if (error) {
+          console.error('Error fetching videos:', error)
+          console.error('Error details:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          })
+
+          // Check if it's specifically a "table doesn't exist" error
+          const isTableNotExistError = error.code === 'PGRST116' ||
+            (error.message && (
+              error.message.includes('relation "public.videos" does not exist') ||
+              error.message.includes('videos') && error.message.includes('does not exist')
+            ))
+
+          if (isTableNotExistError) {
+            console.warn('Videos table does not exist. Please run the database migration in Supabase Dashboard > SQL Editor.')
+            console.warn('Copy the contents of database_migration.sql and run it in your Supabase dashboard.')
+          } else {
+            console.warn('Videos table exists but there was an error fetching data. This might be a permissions issue or data format problem.')
+          }
+
+          setVideos([])
+          setFilteredVideos([])
+        } else {
+          // Transform data to match the expected interface
+          const transformedVideos = (videosData || []).map(video => ({
+            _id: video.id,
+            title: video.title,
+            slug: { current: video.slug },
+            videoUrl: video.video_url,
+            videoType: video.video_type,
+            thumbnailUrl: video.thumbnail_url,
+            description: video.description,
+            category: video.category,
+            year: video.year,
+            tags: video.tags || []
+          }))
+
+          setVideos(transformedVideos)
+          setFilteredVideos(transformedVideos)
+        }
       } catch (error) {
         console.error('Error fetching videos:', error)
+        setVideos([])
+        setFilteredVideos([])
+      } finally {
         setLoading(false)
       }
     }
@@ -328,7 +339,7 @@ export default function VideosPage() {
             >
               {/* Search */}
               <div className="relative max-w-md w-full">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50 w-5 h-5" />
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50 w-5 h-5 z-10" />
                 <Input
                   placeholder="Search videos..."
                   value={searchTerm}
@@ -430,13 +441,24 @@ export default function VideosPage() {
             >
               <Play className="w-16 h-16 mx-auto mb-4 text-white/40" />
               <h3 className="text-2xl font-bold text-white mb-3">
-                {searchTerm ? 'No videos found' : 'No videos yet'}
+                {searchTerm ? 'No videos found' : 'Videos Database Setup Required'}
               </h3>
-              <p className="text-white/60">
+              <p className="text-white/60 mb-4">
                 {searchTerm
                   ? `No videos match "${searchTerm}"`
-                  : 'Videos will appear here soon'}
+                  : 'The videos database table needs to be created.'}
               </p>
+              {!searchTerm && (
+                <div className="bg-white/10 rounded-lg p-4 max-w-md mx-auto">
+                  <p className="text-sm text-white/80 mb-2">To enable videos:</p>
+                  <ol className="text-xs text-white/70 text-left space-y-1">
+                    <li>1. Go to Supabase Dashboard → SQL Editor</li>
+                    <li>2. Copy contents of <code className="bg-black/20 px-1 rounded">database_migration.sql</code></li>
+                    <li>3. Run the SQL to create tables</li>
+                    <li>4. Refresh this page</li>
+                  </ol>
+                </div>
+              )}
             </motion.div>
           )}
         </div>

@@ -2,7 +2,6 @@
 
 import { Phone, Mail } from 'lucide-react'
 import { motion } from 'motion/react'
-import { client } from '@/sanity/lib/client'
 import { useState, useEffect } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { siInstagram, siTelegram, siFacebook, siGmail } from 'simple-icons'
@@ -10,13 +9,49 @@ import type { SimpleIcon } from 'simple-icons'
 import type { LucideIcon } from 'lucide-react'
 
 async function getContactData() {
-  return client.fetch(`
-    *[_type == "contact"][0] {
-      title,
-      subtitle,
-      socialLinks
+  try {
+    const { createClient } = await import('@/lib/supabase/client')
+    const supabase = createClient()
+
+    const { data: contactData, error } = await supabase
+      .from('contact_info')
+      .select('*')
+      .eq('is_active', true)
+      .order('order', { ascending: true })
+
+    if (error) {
+      console.error('Error fetching contact data:', error)
+      // Fallback to default contact data
+      return {
+        title: "Let's Connect",
+        subtitle: "Get in touch for collaborations, inquiries, or just to say hello",
+        socialLinks: []
+      }
     }
-  `)
+
+    return {
+      title: "Let's Connect",
+      subtitle: "Get in touch for collaborations, inquiries, or just to say hello",
+      socialLinks: (contactData || []).map(contact => ({
+        icon: contact.icon || contact.type,
+        title: contact.label,
+        description: `Connect via ${contact.type}`,
+        link: contact.value,
+        platform: contact.type,
+        url: contact.type === 'email' ? `mailto:${contact.value}` :
+             contact.type === 'phone' ? `tel:${contact.value}` :
+             contact.value.startsWith('http') ? contact.value : `https://${contact.value}`
+      }))
+    }
+  } catch (error) {
+    console.error('Error fetching contact data:', error)
+    // Fallback to default contact data
+    return {
+      title: "Let's Connect",
+      subtitle: "Get in touch for collaborations, inquiries, or just to say hello",
+      socialLinks: []
+    }
+  }
 }
 
 interface ContactData {

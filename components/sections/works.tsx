@@ -32,7 +32,7 @@ export function Works({ photos }: { photos: Photo[] }) {
             className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-[0.08em] sm:tracking-[0.1em] uppercase mb-4 sm:mb-6 px-4"
             style={{ fontFamily: 'var(--font-livvic), sans-serif' }}
           >
-            Featured Works
+            Photos
           </h2>
           <motion.div
             className="w-16 sm:w-24 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 rounded-full mx-auto mb-4 sm:mb-6"
@@ -42,7 +42,7 @@ export function Works({ photos }: { photos: Photo[] }) {
             viewport={{ once: true }}
           />
           <p className="text-white/70 text-sm sm:text-base md:text-lg lg:text-xl max-w-3xl mx-auto leading-relaxed px-4">
-            Infinite scroll showcase of my latest photography work and creative projects
+            Infinite scroll showcase of stunning photography moments
           </p>
         </motion.div>
       </div>

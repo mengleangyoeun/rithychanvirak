@@ -55,8 +55,15 @@ export const getOptimizedImageUrl = (publicId: string, width: number = 800) => {
 export const getThumbnailUrl = (publicId: string, width: number = 600) => {
   return buildCloudinaryUrl(publicId, {
     width,
-    quality: 'auto',
+    quality: 90,
     format: 'auto',
     crop: 'fit'
+  })
+}
+
+export const getFullImageUrl = (publicId: string) => {
+  return buildCloudinaryUrl(publicId, {
+    quality: 'auto',
+    format: 'auto'
   })
 }

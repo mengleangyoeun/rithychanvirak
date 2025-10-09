@@ -1,53 +1,93 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { client } from '@/sanity/lib/client'
-import { urlFor } from '@/sanity/lib/image'
+import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
 import Link from 'next/link'
 import { motion } from 'motion/react'
 import { Search, Folder, ArrowRight } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { CollectionCardSkeleton } from '@/components/collection-card-skeleton'
+import type { Collection } from '@/types/database'
 
-interface Collection {
-  _id: string
-  title: string
-  slug: { current: string }
-  description?: string
-  coverImage?: { asset: { _ref: string }; alt?: string }
+interface CollectionWithStats extends Collection {
   totalPhotos: number
   subAlbums: number
 }
 
+// Helper function to count photos recursively
+async function countPhotosRecursively(
+  collectionId: string,
+  supabase: ReturnType<typeof createClient>,
+  collectionMap: Map<string, Collection>
+): Promise<number> {
+  // Count direct photos
+  const { count: directCount } = await supabase
+    .from('collection_photos')
+    .select('*', { count: 'exact', head: true })
+    .eq('collection_id', collectionId)
+
+  let totalCount = directCount || 0
+
+  // Count photos in child collections recursively
+  for (const [id, collection] of collectionMap) {
+    if (collection.parent_id === collectionId) {
+      totalCount += await countPhotosRecursively(id, supabase, collectionMap)
+    }
+  }
+
+  return totalCount
+}
+
 export default function GalleryPage() {
-  const [collections, setCollections] = useState<Collection[]>([])
-  const [filteredCollections, setFilteredCollections] = useState<Collection[]>([])
+  const supabase = createClient()
+  const [collections, setCollections] = useState<CollectionWithStats[]>([])
+  const [filteredCollections, setFilteredCollections] = useState<CollectionWithStats[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function fetchCollections() {
       try {
-        const collectionsData = await client.fetch(`
-          *[_type == "collection" && !defined(parentCollection)] | order(order asc) {
-            _id,
-            title,
-            slug,
-            description,
-            coverImage,
-            "subAlbums": count(*[_type == "collection" && parentCollection._ref == ^._id]),
-            "totalPhotos": count(*[_type == "photo" && (
-              collection._ref == ^._id ||
-              collection->parentCollection._ref == ^._id
-            )])
-          }
-        `)
+        // Fetch all collections to build the hierarchy
+        const { data: allCollections, error: allCollectionsError } = await supabase
+          .from('collections')
+          .select('*')
+          .order('order', { ascending: true })
 
-        const collectionsWithTotals = collectionsData || []
+        if (allCollectionsError) throw allCollectionsError
 
-        setCollections(collectionsWithTotals)
-        setFilteredCollections(collectionsWithTotals)
+        // Build collection map for efficient lookups
+        const collectionMap = new Map<string, Collection>()
+        allCollections?.forEach(collection => {
+          collectionMap.set(collection.id, collection)
+        })
+
+        // Filter root collections
+        const rootCollections = allCollections?.filter(collection => !collection.parent_id) || []
+
+        // Get stats for each root collection
+        const collectionsWithStats: CollectionWithStats[] = await Promise.all(
+          rootCollections.map(async (collection) => {
+            // Count subcollections
+            const { count: subAlbumsCount } = await supabase
+              .from('collections')
+              .select('*', { count: 'exact', head: true })
+              .eq('parent_id', collection.id)
+
+            // Count photos recursively (direct + through subcollections)
+            const totalPhotos = await countPhotosRecursively(collection.id, supabase, collectionMap)
+
+            return {
+              ...collection,
+              totalPhotos,
+              subAlbums: subAlbumsCount || 0
+            }
+          })
+        )
+
+        setCollections(collectionsWithStats)
+        setFilteredCollections(collectionsWithStats)
         setLoading(false)
       } catch (error) {
         console.error('Error fetching collections:', error)
@@ -56,7 +96,7 @@ export default function GalleryPage() {
     }
 
     fetchCollections()
-  }, [])
+  }, [supabase])
 
   useEffect(() => {
     let filtered = [...collections]
@@ -119,7 +159,7 @@ export default function GalleryPage() {
               transition={{ duration: 0.8, delay: 0.3 }}
               className="relative max-w-md mx-auto"
             >
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50 w-5 h-5" />
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50 w-5 h-5 z-10" />
               <Input
                 placeholder="Search collections..."
                 value={searchTerm}
@@ -157,27 +197,25 @@ export default function GalleryPage() {
             >
               {filteredCollections.map((collection, index) => (
                 <motion.div
-                  key={collection._id}
+                  key={collection.id}
                   initial={{ opacity: 0, y: 40 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.5 + index * 0.1 }}
                 >
                   <Link
-                    href={`/collection/${collection.slug.current}`}
+                    href={`/collection/${collection.slug}`}
                     className="group block"
                   >
                     <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 transition-all duration-500 hover:border-white/20 hover:bg-white/10">
 
                       {/* Image */}
-                      {collection.coverImage && (
+                      {collection.cover_image_url && (
                         <Image
-                          src={urlFor(collection.coverImage).width(600).height(450).url()}
-                          alt={collection.coverImage.alt || collection.title}
+                          src={collection.cover_image_url}
+                          alt={collection.title}
                           fill
                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                           className="object-cover transition-transform duration-700 group-hover:scale-110"
-                          placeholder="blur"
-                          blurDataURL="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='450'%3E%3Cfilter id='b' color-interpolation-filters='sRGB'%3E%3CfeGaussianBlur stdDeviation='20'/%3E%3C/filter%3E%3Crect width='600' height='450' fill='%23111827' filter='url(%23b)'/%3E%3C/svg%3E"
                           loading={index < 3 ? "eager" : "lazy"}
                           priority={index < 3}
                         />
