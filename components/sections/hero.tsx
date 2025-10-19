@@ -30,12 +30,10 @@ export function Hero({ data }: { data: HeroData | null }) {
         )}
       </div>
 
-      {/* Animated gradient overlay */}
-      <motion.div
-        className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1.5 }}
+      {/* Overlay layer on top of background */}
+      <div
+        className="absolute inset-0 bg-black"
+        style={{ opacity: data?.overlayOpacity ?? 0.5 }}
       />
 
       {/* Content */}

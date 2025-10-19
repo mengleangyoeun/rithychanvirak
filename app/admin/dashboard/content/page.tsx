@@ -52,7 +52,7 @@ export default function ContentManagementPage() {
   // Check if tables exist
   const checkTablesExist = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('hero_content')
         .select('id')
         .limit(1)

@@ -2,9 +2,10 @@
 
 import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react'
+import { Upload, X, Loader2, Image as ImageIcon, Zap } from 'lucide-react'
 import Image from 'next/image'
 import { toast } from 'sonner'
+import imageCompression from 'browser-image-compression'
 
 interface CloudinaryUploadResponse {
   public_id: string
@@ -27,12 +28,44 @@ interface CloudinaryUploadProps {
   folder?: string
 }
 
+// Compression settings - same as bulk upload
+const COMPRESSION_OPTIONS = {
+  maxSizeMB: 3,
+  maxWidthOrHeight: 4000,
+  useWebWorker: true,
+  fileType: 'image/jpeg',
+  initialQuality: 0.9
+}
+
 export function CloudinaryUpload({ onUploadComplete, currentImageUrl, currentImageId, folder }: CloudinaryUploadProps) {
   const [uploading, setUploading] = useState(false)
   const [preview, setPreview] = useState<string | null>(currentImageUrl || null)
   const [isDragging, setIsDragging] = useState(false)
+  const [compressionStatus, setCompressionStatus] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dragCounter = useRef(0)
+
+  const compressImage = async (file: File): Promise<File> => {
+    const fileSizeMB = file.size / 1024 / 1024
+
+    // If file is already small enough, don't compress
+    if (fileSizeMB <= COMPRESSION_OPTIONS.maxSizeMB) {
+      return file
+    }
+
+    try {
+      setCompressionStatus(`Compressing (${fileSizeMB.toFixed(1)}MB → ${COMPRESSION_OPTIONS.maxSizeMB}MB)...`)
+      const compressedFile = await imageCompression(file, COMPRESSION_OPTIONS)
+      const compressedSizeMB = compressedFile.size / 1024 / 1024
+      console.log(`Compressed: ${fileSizeMB.toFixed(2)}MB → ${compressedSizeMB.toFixed(2)}MB`)
+      setCompressionStatus('')
+      return compressedFile
+    } catch (error) {
+      console.error('Compression failed, using original:', error)
+      setCompressionStatus('')
+      return file
+    }
+  }
 
   const uploadToCloudinary = async (file: File) => {
     const formData = new FormData()
@@ -61,30 +94,29 @@ export function CloudinaryUpload({ onUploadComplete, currentImageUrl, currentIma
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validate file type
+    // Validate file type only
     if (!file.type.startsWith('image/')) {
       toast.error('Please select an image file')
       return
     }
 
-    // Validate file size (10MB max)
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('File size must be less than 10MB')
-      return
-    }
+    // NO size limit - we'll compress if needed!
 
     setUploading(true)
 
     try {
+      // Compress if needed
+      const compressedFile = await compressImage(file)
+
       // Create preview
       const reader = new FileReader()
       reader.onloadend = () => {
         setPreview(reader.result as string)
       }
-      reader.readAsDataURL(file)
+      reader.readAsDataURL(compressedFile)
 
       // Upload to Cloudinary
-      const result = await uploadToCloudinary(file)
+      const result = await uploadToCloudinary(compressedFile)
 
       toast.success('Image uploaded successfully!')
 
@@ -143,30 +175,29 @@ export function CloudinaryUpload({ onUploadComplete, currentImageUrl, currentIma
     const file = e.dataTransfer.files?.[0]
     if (!file) return
 
-    // Validate file type
+    // Validate file type only
     if (!file.type.startsWith('image/')) {
       toast.error('Please select an image file')
       return
     }
 
-    // Validate file size (10MB max)
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('File size must be less than 10MB')
-      return
-    }
+    // NO size limit - we'll compress if needed!
 
     setUploading(true)
 
     try {
+      // Compress if needed
+      const compressedFile = await compressImage(file)
+
       // Create preview
       const reader = new FileReader()
       reader.onloadend = () => {
         setPreview(reader.result as string)
       }
-      reader.readAsDataURL(file)
+      reader.readAsDataURL(compressedFile)
 
       // Upload to Cloudinary
-      const result = await uploadToCloudinary(file)
+      const result = await uploadToCloudinary(compressedFile)
 
       toast.success('Image uploaded successfully!')
 
@@ -236,7 +267,9 @@ export function CloudinaryUpload({ onUploadComplete, currentImageUrl, currentIma
             {uploading ? (
               <>
                 <Loader2 className="w-12 h-12 text-muted-foreground animate-spin mb-4" />
-                <p className="text-sm text-muted-foreground">Uploading to Cloudinary...</p>
+                <p className="text-sm text-muted-foreground">
+                  {compressionStatus || 'Uploading to Cloudinary...'}
+                </p>
               </>
             ) : isDragging ? (
               <>
@@ -248,7 +281,11 @@ export function CloudinaryUpload({ onUploadComplete, currentImageUrl, currentIma
               <>
                 <ImageIcon className="w-12 h-12 text-muted-foreground mb-4" />
                 <p className="text-sm font-medium mb-1">Drag & drop or click to upload</p>
-                <p className="text-xs text-muted-foreground">PNG, JPG, WEBP up to 10MB</p>
+                <div className="flex items-center gap-2 mt-1 text-xs text-green-600">
+                  <Zap className="w-3 h-3" />
+                  <span>Auto-compression for large files</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WEBP - any size!</p>
               </>
             )}
           </button>

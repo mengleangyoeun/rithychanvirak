@@ -2,11 +2,12 @@
 
 import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { Upload, X, Loader2, Image as ImageIcon, CheckCircle2 } from 'lucide-react'
+import { Upload, X, Loader2, Image as ImageIcon, CheckCircle2, Zap } from 'lucide-react'
 import Image from 'next/image'
 import { toast } from 'sonner'
 import { Progress } from '@/components/ui/progress'
 import exifr from 'exifr'
+import imageCompression from 'browser-image-compression'
 
 interface CloudinaryUploadResponse {
   public_id: string
@@ -38,15 +39,24 @@ interface UploadedImage {
 
 interface CloudinaryBulkUploadProps {
   onUploadComplete: (images: UploadedImage[]) => void
-  maxFiles?: number
   folder?: string
 }
 
-export function CloudinaryBulkUpload({ onUploadComplete, maxFiles = 50, folder }: CloudinaryBulkUploadProps) {
+// Compression settings - optimized for photography
+const COMPRESSION_OPTIONS = {
+  maxSizeMB: 3,              // Target max size (will compress if larger)
+  maxWidthOrHeight: 4000,    // Max dimension (good for web while maintaining quality)
+  useWebWorker: true,        // Use web worker for better performance
+  fileType: 'image/jpeg',    // Output format
+  initialQuality: 0.9        // High quality (90%)
+}
+
+export function CloudinaryBulkUpload({ onUploadComplete, folder }: CloudinaryBulkUploadProps) {
   const [uploading, setUploading] = useState(false)
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([])
   const [progress, setProgress] = useState(0)
   const [currentFile, setCurrentFile] = useState<string>('')
+  const [compressionStatus, setCompressionStatus] = useState<string>('')
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dragCounter = useRef(0)
@@ -109,6 +119,33 @@ export function CloudinaryBulkUpload({ onUploadComplete, maxFiles = 50, folder }
     }
   }
 
+  const compressImage = async (file: File): Promise<File> => {
+    const fileSizeMB = file.size / 1024 / 1024
+
+    // If file is already small enough, don't compress
+    if (fileSizeMB <= COMPRESSION_OPTIONS.maxSizeMB) {
+      return file
+    }
+
+    try {
+      setCompressionStatus(`Compressing ${file.name} (${fileSizeMB.toFixed(1)}MB → ${COMPRESSION_OPTIONS.maxSizeMB}MB)...`)
+
+      const compressedFile = await imageCompression(file, COMPRESSION_OPTIONS)
+
+      const compressedSizeMB = compressedFile.size / 1024 / 1024
+      const savedMB = fileSizeMB - compressedSizeMB
+
+      console.log(`Compressed ${file.name}: ${fileSizeMB.toFixed(2)}MB → ${compressedSizeMB.toFixed(2)}MB (saved ${savedMB.toFixed(2)}MB)`)
+
+      setCompressionStatus('')
+      return compressedFile
+    } catch (error) {
+      console.error('Compression failed, using original:', error)
+      setCompressionStatus('')
+      return file
+    }
+  }
+
   const uploadToCloudinary = async (file: File): Promise<CloudinaryUploadResponse> => {
     const formData = new FormData()
     formData.append('file', file)
@@ -136,23 +173,14 @@ export function CloudinaryBulkUpload({ onUploadComplete, maxFiles = 50, folder }
     const files = Array.from(e.target.files || [])
     if (files.length === 0) return
 
-    // Validate file count
-    if (files.length > maxFiles) {
-      toast.error(`Maximum ${maxFiles} files allowed`)
-      return
-    }
-
-    // Validate all files are images
+    // Only validate file type - NO file count or size limits!
     const invalidFiles = files.filter(file => !file.type.startsWith('image/'))
     if (invalidFiles.length > 0) {
-      toast.error('All files must be images')
-      return
-    }
-
-    // Validate file sizes
-    const oversizedFiles = files.filter(file => file.size > 10 * 1024 * 1024)
-    if (oversizedFiles.length > 0) {
-      toast.error('All files must be less than 10MB')
+      toast.error(`${invalidFiles.length} file(s) are not images and will be skipped`)
+      // Filter out invalid files
+      const validFiles = files.filter(file => file.type.startsWith('image/'))
+      if (validFiles.length === 0) return
+      await processFiles(validFiles)
       return
     }
 
@@ -205,27 +233,16 @@ export function CloudinaryBulkUpload({ onUploadComplete, maxFiles = 50, folder }
     const files = Array.from(e.dataTransfer.files)
     if (files.length === 0) return
 
-    // Validate file count
-    if (files.length > maxFiles) {
-      toast.error(`Maximum ${maxFiles} files allowed`)
-      return
-    }
-
-    // Validate all files are images
+    // Only validate file type - NO limits!
     const invalidFiles = files.filter(file => !file.type.startsWith('image/'))
     if (invalidFiles.length > 0) {
-      toast.error('All files must be images')
+      toast.error(`${invalidFiles.length} file(s) are not images and will be skipped`)
+      const validFiles = files.filter(file => file.type.startsWith('image/'))
+      if (validFiles.length === 0) return
+      await processFiles(validFiles)
       return
     }
 
-    // Validate file sizes
-    const oversizedFiles = files.filter(file => file.size > 10 * 1024 * 1024)
-    if (oversizedFiles.length > 0) {
-      toast.error('All files must be less than 10MB')
-      return
-    }
-
-    // Process files
     await processFiles(files)
   }
 
@@ -233,12 +250,28 @@ export function CloudinaryBulkUpload({ onUploadComplete, maxFiles = 50, folder }
     setUploading(true)
     setProgress(0)
     const uploaded: UploadedImage[] = []
+    let compressedCount = 0
+    let totalSavedMB = 0
 
     try {
       for (let i = 0; i < files.length; i++) {
-        const file = files[i]
-        setCurrentFile(file.name)
+        const originalFile = files[i]
+        const originalSizeMB = originalFile.size / 1024 / 1024
+
+        setCurrentFile(`${i + 1}/${files.length}: ${originalFile.name}`)
         setProgress(((i + 1) / files.length) * 100)
+
+        // Extract EXIF metadata BEFORE compression (to preserve it)
+        const exifData = await extractExifData(originalFile)
+
+        // Compress if needed
+        const file = await compressImage(originalFile)
+        const compressedSizeMB = file.size / 1024 / 1024
+
+        if (file !== originalFile) {
+          compressedCount++
+          totalSavedMB += (originalSizeMB - compressedSizeMB)
+        }
 
         // Create preview
         const preview = await new Promise<string>((resolve) => {
@@ -246,9 +279,6 @@ export function CloudinaryBulkUpload({ onUploadComplete, maxFiles = 50, folder }
           reader.onloadend = () => resolve(reader.result as string)
           reader.readAsDataURL(file)
         })
-
-        // Extract EXIF metadata
-        const exifData = await extractExifData(file)
 
         // Upload to Cloudinary
         const result = await uploadToCloudinary(file)
@@ -259,13 +289,20 @@ export function CloudinaryBulkUpload({ onUploadComplete, maxFiles = 50, folder }
           image_width: result.width,
           image_height: result.height,
           preview,
-          name: file.name,
+          name: originalFile.name,
           ...exifData, // Include EXIF metadata
         })
       }
 
       setUploadedImages([...uploadedImages, ...uploaded])
-      toast.success(`${uploaded.length} image${uploaded.length > 1 ? 's' : ''} uploaded successfully!`)
+
+      // Show success message with compression stats
+      let message = `${uploaded.length} image${uploaded.length > 1 ? 's' : ''} uploaded successfully!`
+      if (compressedCount > 0) {
+        message += ` (${compressedCount} compressed, saved ${totalSavedMB.toFixed(1)}MB)`
+      }
+      toast.success(message)
+
       onUploadComplete([...uploadedImages, ...uploaded])
     } catch (error) {
       console.error('Upload error:', error)
@@ -273,6 +310,7 @@ export function CloudinaryBulkUpload({ onUploadComplete, maxFiles = 50, folder }
     } finally {
       setUploading(false)
       setCurrentFile('')
+      setCompressionStatus('')
       setProgress(0)
     }
   }
@@ -318,8 +356,12 @@ export function CloudinaryBulkUpload({ onUploadComplete, maxFiles = 50, folder }
               <>
                 <ImageIcon className="w-12 h-12 text-muted-foreground mb-4" />
                 <p className="text-sm font-medium mb-1">Drag & drop images here or click to browse</p>
-                <p className="text-xs text-muted-foreground">Select multiple images (up to {maxFiles})</p>
-                <p className="text-xs text-muted-foreground">PNG, JPG, WEBP up to 10MB each</p>
+                <p className="text-xs text-muted-foreground">Upload unlimited photos</p>
+                <div className="flex items-center gap-2 mt-2 text-xs text-green-600">
+                  <Zap className="w-3 h-3" />
+                  <span>Auto-compression for large files</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WEBP - any size, we&apos;ll optimize it!</p>
               </>
             )}
           </button>
@@ -332,7 +374,9 @@ export function CloudinaryBulkUpload({ onUploadComplete, maxFiles = 50, folder }
           <div className="flex items-center gap-3">
             <Loader2 className="w-5 h-5 animate-spin text-primary" />
             <div className="flex-1">
-              <p className="text-sm font-medium">Uploading & extracting metadata...</p>
+              <p className="text-sm font-medium">
+                {compressionStatus || 'Uploading & extracting metadata...'}
+              </p>
               <p className="text-xs text-muted-foreground">{currentFile}</p>
             </div>
           </div>

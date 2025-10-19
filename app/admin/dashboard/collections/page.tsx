@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Collection, Photo, CollectionPhoto } from '@/types/database'
+import { getCollectionFolder } from '@/lib/cloudinary-folders'
 
 interface CollectionPhotoWithPhoto extends CollectionPhoto {
   photos: Photo
@@ -276,6 +277,18 @@ export default function CollectionsPage() {
           .eq('id', update.id)
       }
 
+      // Revalidate homepage to show new order immediately
+      try {
+        await fetch('/api/revalidate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: '/' })
+        })
+      } catch (revalidateError) {
+        console.warn('Failed to revalidate homepage:', revalidateError)
+        // Don't fail the whole operation if revalidation fails
+      }
+
       toast.success('Collection order updated')
     } catch (error: unknown) {
       console.error('Error updating order:', error)
@@ -381,6 +394,7 @@ export default function CollectionsPage() {
   useEffect(() => {
     updateCurrentItems()
     loadCollectionPhotos()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPath, allCollections, searchQuery])
 
 
@@ -402,22 +416,6 @@ export default function CollectionsPage() {
       toast.error('Failed to load collections')
     } finally {
       setLoadingStates(prev => ({ ...prev, loading: false }))
-    }
-  }
-
-  const loadAvailableImages = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('photos')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50) // Limit to recent 50 images for performance
-
-      if (error) throw error
-
-      setAvailableImages(data || [])
-    } catch (error: unknown) {
-      console.error('Error loading available images:', error)
     }
   }
 
@@ -486,13 +484,11 @@ export default function CollectionsPage() {
   // Memoized breadcrumb computation
   const currentPathNames = useMemo(() => {
     const names: string[] = ['Home']
-    let currentId: string | null = null
 
     for (const pathId of currentPath) {
       const collection = allCollections.find(c => c.id === pathId)
       if (collection) {
         names.push(collection.title)
-        currentId = pathId
       }
     }
 
@@ -762,7 +758,7 @@ export default function CollectionsPage() {
         camera: editingPhoto.camera,
         lens: editingPhoto.lens,
         settings: Object.fromEntries(
-          Object.entries(editingPhoto.settings || {}).filter(([_, value]) => value !== '')
+          Object.entries(editingPhoto.settings || {}).filter(([, value]) => value !== '')
         ),
         location: editingPhoto.location,
         date_taken: editingPhoto.date_taken ? new Date(editingPhoto.date_taken).toISOString() : null
@@ -1628,7 +1624,10 @@ export default function CollectionsPage() {
           </DialogHeader>
 
           <div className="flex-1 overflow-hidden">
-            <CloudinaryBulkUpload onUploadComplete={handlePhotoUpload} />
+            <CloudinaryBulkUpload
+              onUploadComplete={handlePhotoUpload}
+              folder={currentPath.length > 0 ? getCollectionFolder(allCollections.find(c => c.id === currentPath[currentPath.length - 1]) || { slug: 'untitled' }) : 'rithychanvirak/misc'}
+            />
           </div>
 
           <DialogFooter>

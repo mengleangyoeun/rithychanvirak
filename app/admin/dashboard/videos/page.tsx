@@ -12,12 +12,15 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Card, CardContent } from '@/components/ui/card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Pencil, Video, RefreshCw, Search, X, Filter, Play, Calendar, ExternalLink, MoreVertical } from 'lucide-react'
+import { Plus, Pencil, Video, RefreshCw, Search, X, Filter, Play, Calendar, ExternalLink, MoreVertical, GripVertical, AlertCircle, Loader2 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import Image from 'next/image'
 import { toast } from 'sonner'
 import { ReorderableStoryboard } from '@/components/reorderable-storyboard'
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core'
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, rectSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 export default function VideosManagementPage() {
   const supabase = createClient()
@@ -25,7 +28,8 @@ export default function VideosManagementPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingVideo, setEditingVideo] = useState<VideoType | null>(null)
-  
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
   // Search and filter state
   const [searchTerm, setSearchTerm] = useState('')
   const [filterCategory, setFilterCategory] = useState<string>('all')
@@ -119,44 +123,49 @@ export default function VideosManagementPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
 
-    const videoData = {
-      ...formData,
-      tags: formData.tags ? formData.tags.split(',').map(t => t.trim()) : [],
-      year: formData.year || null,
-      thumbnail_url: formData.thumbnail_url || null,
-      description: formData.description || null,
-      category: formData.category || null,
-    }
-
-    if (editingVideo) {
-      const { error } = await supabase
-        .from('videos')
-        .update(videoData)
-        .eq('id', editingVideo.id)
-
-      if (!error) {
-        await saveStoryboardImages(editingVideo.id)
-        toast.success('Video updated successfully')
-        await fetchVideos()
-        resetForm()
-      } else {
-        toast.error('Failed to update video')
+    try {
+      const videoData = {
+        ...formData,
+        tags: formData.tags ? formData.tags.split(',').map(t => t.trim()) : [],
+        year: formData.year || null,
+        thumbnail_url: formData.thumbnail_url || null,
+        description: formData.description || null,
+        category: formData.category || null,
       }
-    } else {
-      const { data, error } = await supabase
-        .from('videos')
-        .insert([videoData])
-        .select()
 
-      if (!error && data && data[0]) {
-        await saveStoryboardImages(data[0].id)
-        toast.success('Video created successfully')
-        await fetchVideos()
-        resetForm()
+      if (editingVideo) {
+        const { error } = await supabase
+          .from('videos')
+          .update(videoData)
+          .eq('id', editingVideo.id)
+
+        if (!error) {
+          await saveStoryboardImages(editingVideo.id)
+          toast.success('Video updated successfully')
+          await fetchVideos()
+          resetForm()
+        } else {
+          toast.error('Failed to update video')
+        }
       } else {
-        toast.error('Failed to create video')
+        const { data, error } = await supabase
+          .from('videos')
+          .insert([videoData])
+          .select()
+
+        if (!error && data && data[0]) {
+          await saveStoryboardImages(data[0].id)
+          toast.success('Video created successfully')
+          await fetchVideos()
+          resetForm()
+        } else {
+          toast.error('Failed to create video')
+        }
       }
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -295,6 +304,271 @@ export default function VideosManagementPage() {
     }
 
     return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="225"%3E%3Crect width="400" height="225" fill="%23f3f4f6"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="system-ui" font-size="16" fill="%239ca3af"%3ENo Thumbnail%3C/text%3E%3C/svg%3E'
+  }
+
+  // Update video order in database
+  const updateVideoOrder = async (reorderedVideos: VideoType[]) => {
+    try {
+      const updates = reorderedVideos.map((video, index) => ({
+        id: video.id,
+        order: index
+      }))
+
+      for (const update of updates) {
+        await supabase
+          .from('videos')
+          .update({ order: update.order })
+          .eq('id', update.id)
+      }
+
+      // Revalidate homepage to show new order immediately
+      try {
+        await fetch('/api/revalidate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: '/' })
+        })
+      } catch (revalidateError) {
+        console.warn('Failed to revalidate homepage:', revalidateError)
+        // Don't fail the whole operation if revalidation fails
+      }
+
+      toast.success('Video order updated')
+    } catch (error: unknown) {
+      console.error('Error updating order:', error)
+      toast.error('Failed to update video order')
+      // Refresh to revert the local state on error
+      fetchVideos()
+    }
+  }
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Require 8px movement before drag starts
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  // Handle drag end
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id) return
+
+    // Find indices in the full videos array
+    const oldIndex = videos.findIndex((video) => video.id === active.id)
+    const newIndex = videos.findIndex((video) => video.id === over.id)
+
+    // Reorder the full videos array
+    const reorderedVideos = arrayMove(videos, oldIndex, newIndex)
+    setVideos(reorderedVideos)
+
+    // Update order in database
+    updateVideoOrder(reorderedVideos)
+  }
+
+  // Sortable Video Card Component
+  function SortableVideoCard({ video }: { video: VideoType }) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: video.id })
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+    }
+
+    return (
+      <div ref={setNodeRef} style={style} className={isDragging ? 'opacity-50' : ''}>
+        <Card className="group relative overflow-hidden hover:shadow-lg transition-shadow">
+          {/* Drag Handle */}
+          <div
+            className="absolute top-2 left-2 z-20 cursor-grab active:cursor-grabbing touch-none"
+            {...listeners}
+            {...attributes}
+          >
+            <div className="bg-background/95 backdrop-blur-sm p-2 rounded-md shadow-lg border border-border hover:bg-accent hover:border-primary transition-colors">
+              <GripVertical className="w-4 h-4 text-muted-foreground" />
+            </div>
+          </div>
+
+          {/* Thumbnail */}
+          <div
+            className="relative aspect-video bg-muted cursor-pointer"
+            onClick={(e) => {
+              // Prevent click when dragging
+              e.stopPropagation()
+              window.open(video.video_url, '_blank')
+            }}
+          >
+            <Image
+              src={getVideoThumbnail(video)}
+              alt={video.title}
+              fill
+              className="object-cover"
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+            />
+
+            {/* Play button overlay */}
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center">
+                <Play className="w-6 h-6 text-black ml-1" fill="black" />
+              </div>
+            </div>
+
+            {/* Platform badge */}
+            <Badge className="absolute top-2 right-2 bg-black/70 text-white border-0">
+              {video.video_type}
+            </Badge>
+          </div>
+
+          {/* Content */}
+          <CardContent className="p-4 space-y-3">
+            <div>
+              <h3 className="font-semibold line-clamp-2 mb-1">
+                {video.title}
+              </h3>
+              {video.description && (
+                <p className="text-sm text-muted-foreground line-clamp-2">
+                  {video.description}
+                </p>
+              )}
+            </div>
+
+            {/* Meta */}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+              {video.year && (
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  {video.year}
+                </span>
+              )}
+              {video.category && (
+                <Badge variant="secondary" className="text-xs">
+                  {video.category}
+                </Badge>
+              )}
+              <Badge variant={video.is_active ? "default" : "secondary"} className="text-xs">
+                {video.is_active ? "Active" : "Inactive"}
+              </Badge>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 pt-2">
+              <Button
+                size="sm"
+                className="flex-1"
+                onClick={() => window.open(video.video_url, '_blank')}
+              >
+                <Play className="w-3 h-3 mr-1" />
+                Watch
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleEdit(video)}
+              >
+                <Pencil className="w-3 h-3 mr-1" />
+                Edit
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleEdit(video)}>
+                    <Pencil className="w-4 h-4 mr-2" />
+                    Edit Details
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => window.open(video.video_url, '_blank')}>
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Open Original
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleDelete(video.id)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Delete Video
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Toggles Section */}
+            <div className="space-y-2 pt-3 border-t">
+              {/* Status Toggle */}
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">Status</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground min-w-[50px] text-right">
+                    {video.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                  <Switch
+                    checked={video.is_active}
+                    onCheckedChange={async (checked) => {
+                      try {
+                        const { error } = await supabase
+                          .from('videos')
+                          .update({ is_active: checked })
+                          .eq('id', video.id)
+
+                        if (error) throw error
+                        await fetchVideos()
+                        toast.success(`Video ${checked ? 'activated' : 'deactivated'}`)
+                      } catch (error) {
+                        console.error('Error updating video status:', error)
+                        toast.error('Failed to update video status')
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Featured Toggle */}
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">Featured</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground min-w-[50px] text-right">
+                    {video.featured ? 'Yes' : 'No'}
+                  </span>
+                  <Switch
+                    checked={video.featured || false}
+                    onCheckedChange={async (checked) => {
+                      try {
+                        const { error } = await supabase
+                          .from('videos')
+                          .update({ featured: checked })
+                          .eq('id', video.id)
+
+                        if (error) throw error
+                        await fetchVideos()
+                        toast.success(`Video ${checked ? 'marked as featured' : 'removed from featured'}`)
+                      } catch (error) {
+                        console.error('Error updating featured status:', error)
+                        toast.error('Failed to update featured status')
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -592,17 +866,21 @@ export default function VideosManagementPage() {
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
+            {/* Featured Toggle */}
+            <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
+              <div className="space-y-0.5">
+                <Label htmlFor="featured" className="text-base font-medium cursor-pointer">
+                  Featured Video
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Display this video on the homepage
+                </p>
+              </div>
+              <Switch
                 id="featured"
                 checked={formData.featured}
-                onChange={(e) => setFormData({ ...formData, featured: e.target.checked })}
-                className="w-4 h-4 rounded border-gray-300"
+                onCheckedChange={(checked) => setFormData({ ...formData, featured: checked })}
               />
-              <Label htmlFor="featured" className="cursor-pointer">
-                Featured video on homepage
-              </Label>
             </div>
 
             <div className="space-y-2">
@@ -625,12 +903,17 @@ export default function VideosManagementPage() {
                 {editingVideo ? 'Update your video information' : 'All fields except title, slug, and video URL are optional'}
               </p>
               <DialogFooter className="gap-2 w-full sm:w-auto">
-                <Button type="button" variant="outline" onClick={resetForm} className="flex-1 sm:flex-none">
+                <Button type="button" variant="outline" onClick={resetForm} className="flex-1 sm:flex-none" disabled={isSubmitting}>
                   <X className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                   <span className="text-xs sm:text-sm">Cancel</span>
                 </Button>
-                <Button type="submit" className="flex-1 sm:flex-none sm:min-w-[120px]">
-                  {editingVideo ? (
+                <Button type="submit" className="flex-1 sm:flex-none sm:min-w-[120px]" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
+                      <span className="text-xs sm:text-sm">{editingVideo ? 'Updating...' : 'Creating...'}</span>
+                    </>
+                  ) : editingVideo ? (
                     <>
                       <Pencil className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                       <span className="text-xs sm:text-sm">Update</span>
@@ -647,6 +930,31 @@ export default function VideosManagementPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Warning Banner for Filters */}
+      {!loading && hasActiveFilters && filteredVideos.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20">
+          <CardContent className="p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h4 className="font-medium text-amber-900 dark:text-amber-200 mb-1">
+                Filters Active - Drag & Drop Disabled
+              </h4>
+              <p className="text-sm text-amber-800 dark:text-amber-300">
+                Clear all filters to enable drag-and-drop reordering. Reordering works only when viewing all videos.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearFilters}
+              className="border-amber-300 hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900/50"
+            >
+              Clear Filters
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Videos Grid */}
       {loading ? (
@@ -697,140 +1005,22 @@ export default function VideosManagementPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredVideos.map((video) => (
-            <Card key={video.id} className="group overflow-hidden hover:shadow-lg transition-shadow">
-              {/* Thumbnail */}
-              <div
-                className="relative aspect-video bg-muted cursor-pointer"
-                onClick={() => window.open(video.video_url, '_blank')}
-              >
-                <Image
-                  src={getVideoThumbnail(video)}
-                  alt={video.title}
-                  fill
-                  className="object-cover"
-                />
-
-                {/* Play button overlay */}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center">
-                    <Play className="w-6 h-6 text-black ml-1" fill="black" />
-                  </div>
-                </div>
-
-                {/* Platform badge */}
-                <Badge className="absolute top-2 right-2 bg-black/70 text-white border-0">
-                  {video.video_type}
-                </Badge>
-              </div>
-
-              {/* Content */}
-              <CardContent className="p-4 space-y-3">
-                <div>
-                  <h3 className="font-semibold line-clamp-2 mb-1">
-                    {video.title}
-                  </h3>
-                  {video.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {video.description}
-                    </p>
-                  )}
-                </div>
-
-                {/* Meta */}
-                <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                  {video.year && (
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
-                      {video.year}
-                    </span>
-                  )}
-                  {video.category && (
-                    <Badge variant="secondary" className="text-xs">
-                      {video.category}
-                    </Badge>
-                  )}
-                  <Badge variant={video.is_active ? "default" : "secondary"} className="text-xs">
-                    {video.is_active ? "Active" : "Inactive"}
-                  </Badge>
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => window.open(video.video_url, '_blank')}
-                  >
-                    <Play className="w-3 h-3 mr-1" />
-                    Watch
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleEdit(video)}
-                  >
-                    <Pencil className="w-3 h-3 mr-1" />
-                    Edit
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button size="sm" variant="outline">
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleEdit(video)}>
-                        <Pencil className="w-4 h-4 mr-2" />
-                        Edit Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => window.open(video.video_url, '_blank')}>
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        Open Original
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleDelete(video.id)}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <X className="w-4 h-4 mr-2" />
-                        Delete Video
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-
-                {/* Status Toggle */}
-                <div className="flex items-center justify-between pt-2 border-t">
-                  <span className="text-xs text-muted-foreground">Status</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">
-                      {video.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                    <Switch
-                      checked={video.is_active}
-                      onCheckedChange={async (checked) => {
-                        try {
-                          const { error } = await supabase
-                            .from('videos')
-                            .update({ is_active: checked })
-                            .eq('id', video.id)
-
-                          if (error) throw error
-                          await fetchVideos()
-                          toast.success(`Video ${checked ? 'activated' : 'deactivated'}`)
-                        } catch (error) {
-                          console.error('Error updating video status:', error)
-                          toast.error('Failed to update video status')
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={videos.map(v => v.id)}
+            strategy={rectSortingStrategy}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredVideos.map((video) => (
+                <SortableVideoCard key={video.id} video={video} />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
     </div>
   )

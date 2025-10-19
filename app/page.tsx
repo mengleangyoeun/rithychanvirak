@@ -19,8 +19,8 @@ const CTA = dynamic(() => import('@/components/sections/cta').then(mod => ({ def
 })
 
 
-// Revalidate every 60 seconds (ISR)
-export const revalidate = 60
+// Force dynamic rendering and revalidate on every request since we use Supabase cookies
+export const revalidate = 0
 
 export default async function HomePage() {
   // Fetch content from database
@@ -93,7 +93,13 @@ export default async function HomePage() {
           console.log('Services table not found - run migration first')
           return []
         }
-        console.error('Error fetching services:', error)
+        console.error('Error fetching services:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+          fullError: error
+        })
         return []
       }
 
@@ -105,7 +111,13 @@ export default async function HomePage() {
         icon: service.icon
       }))
     } catch (error) {
-      console.error('Error fetching services:', error)
+      console.error('Error fetching services (catch block):', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        type: typeof error,
+        stringified: JSON.stringify(error)
+      })
       return []
     }
   }

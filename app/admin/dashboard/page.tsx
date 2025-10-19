@@ -318,7 +318,7 @@ export default function DashboardPage() {
             </Card>
           ))
         ) : (
-          statCards.map((stat, index) => {
+          statCards.map((stat) => {
             const Icon = stat.icon
             return (
               <Link key={stat.label} href={stat.href}>
@@ -404,7 +404,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-3">
-                {recentPhotos.slice(0, 6).map((photo, index) => (
+                {recentPhotos.slice(0, 6).map((photo) => (
                   <Link
                     key={photo.id}
                     href="/admin/dashboard/collections"

@@ -2,8 +2,9 @@ import type { NextConfig } from "next";
 import path from 'path';
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
-  outputFileTracingRoot: path.join(process.cwd()),
+  // Commented out for development - enable for Docker deployment
+  // output: 'standalone',
+  // outputFileTracingRoot: path.join(process.cwd()),
   images: {
     remotePatterns: [
       {
@@ -55,7 +56,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; connect-src 'self' https:; frame-src 'self' https://www.youtube.com https://player.vimeo.com https://drive.google.com; object-src 'none'; base-uri 'self'; form-action 'self';"
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; connect-src 'self' https://*.supabase.co https://api.cloudinary.com https:; frame-src 'self' https://www.youtube.com https://player.vimeo.com https://drive.google.com; object-src 'none'; base-uri 'self'; form-action 'self';"
           },
           {
             key: 'X-DNS-Prefetch-Control',

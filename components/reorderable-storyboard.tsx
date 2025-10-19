@@ -50,11 +50,13 @@ export function ReorderableStoryboard({ images, onChange, maxImages = 20 }: Reor
   }
 
   const handleUpload = (newImages: Array<{ image_id: string; image_url: string; name: string }>) => {
-    const combined = [...images, ...newImages.map(img => ({
+    const remainingSlots = maxImages - images.length
+    const imagesToAdd = newImages.slice(0, remainingSlots).map(img => ({
       image_id: img.image_id,
       image_url: img.image_url,
       name: img.name,
-    }))]
+    }))
+    const combined = [...images, ...imagesToAdd]
     onChange(combined)
     setShowUpload(false)
   }
@@ -75,7 +77,6 @@ export function ReorderableStoryboard({ images, onChange, maxImages = 20 }: Reor
         </div>
         <CloudinaryBulkUpload
           onUploadComplete={handleUpload}
-          maxFiles={maxImages - images.length}
         />
       </div>
     )

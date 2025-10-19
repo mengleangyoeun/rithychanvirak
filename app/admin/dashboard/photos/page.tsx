@@ -12,11 +12,15 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Switch } from '@/components/ui/switch'
 import { CloudinaryUpload } from '@/components/cloudinary-upload'
-import { Plus, Pencil, ImageIcon, Search, X, Filter, Eye, ExternalLink, MoreVertical, Calendar, MapPin, Camera, Settings, Star, Info } from 'lucide-react'
+import { Plus, Pencil, ImageIcon, Search, X, Filter, Eye, ExternalLink, MoreVertical, Calendar, MapPin, Camera, Settings, Star, Info, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
 import Image from 'next/image'
 import { getThumbnailUrl } from '@/lib/cloudinary'
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core'
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, rectSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 export default function PhotosManagementPage() {
   const supabase = createClient()
@@ -94,7 +98,7 @@ export default function PhotosManagementPage() {
     const photoData = {
       ...formData,
       settings: Object.fromEntries(
-        Object.entries(formData.settings).filter(([_, value]) => value !== '')
+        Object.entries(formData.settings).filter(([, value]) => value !== '')
       ),
       date_taken: formData.date_taken ? new Date(formData.date_taken).toISOString() : null
     }
@@ -206,6 +210,226 @@ export default function PhotosManagementPage() {
   const featuredCount = photos.filter(p => p.featured).length
   const withExifCount = photos.filter(p => p.camera || p.lens || Object.keys(p.settings || {}).length > 0).length
   const withLocationCount = photos.filter(p => p.location).length
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Require 8px movement before drag starts
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  // Handle drag end - Note: Photos don't have order field yet, this is ready for when you add it
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id) return
+
+    const oldIndex = photos.findIndex((photo) => photo.id === active.id)
+    const newIndex = photos.findIndex((photo) => photo.id === over.id)
+
+    const reorderedPhotos = arrayMove(photos, oldIndex, newIndex)
+    setPhotos(reorderedPhotos)
+
+    // TODO: Add updatePhotoOrder function when order field is added to photos table
+    toast.info('Drag-and-drop ready! Add "order" field to photos table to persist changes.')
+  }
+
+  // Sortable Photo Card Component
+  function SortablePhotoCard({ photo }: { photo: Photo }) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: photo.id })
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+    }
+
+    // Calculate aspect ratio from image dimensions, fallback to 4/5
+    const aspectRatio = photo.image_width && photo.image_height
+      ? photo.image_width / photo.image_height
+      : 4/5
+
+    return (
+      <div ref={setNodeRef} style={style} className={isDragging ? 'opacity-50' : ''}>
+        <Card className="group relative overflow-hidden border-0 shadow-md hover:shadow-xl transition-all duration-300">
+          {/* Drag Handle */}
+          <div
+            className="absolute top-2 left-2 z-20 cursor-grab active:cursor-grabbing touch-none"
+            {...listeners}
+            {...attributes}
+          >
+            <div className="bg-background/95 backdrop-blur-sm p-2 rounded-md shadow-lg border border-border hover:bg-accent hover:border-primary transition-colors">
+              <GripVertical className="w-4 h-4 text-muted-foreground" />
+            </div>
+          </div>
+
+          {/* Thumbnail */}
+          <div className="relative bg-muted overflow-hidden" style={{ aspectRatio: aspectRatio.toString() }}>
+            {photo.image_id ? (
+              <Image
+                src={getThumbnailUrl(photo.image_id, 600)}
+                alt={photo.alt || photo.title}
+                fill
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                className="object-cover group-hover:scale-110 transition-transform duration-500"
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                <ImageIcon className="w-12 h-12 text-muted-foreground" />
+              </div>
+            )}
+
+            {/* Featured Badge */}
+            {photo.featured && (
+              <div className="absolute top-2 right-2 z-10">
+                <Badge className="bg-yellow-500 text-white border-0 shadow-lg">
+                  <Star className="w-3 h-3 mr-1 fill-white" />
+                  Featured
+                </Badge>
+              </div>
+            )}
+
+            {/* Hover Overlay with Quick Actions */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              <div className="absolute bottom-3 left-3 right-3 flex gap-2">
+                <Button
+                  size="sm"
+                  className="flex-1 bg-white text-black hover:bg-gray-100"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleEdit(photo)
+                  }}
+                >
+                  <Pencil className="w-3 h-3 mr-1" />
+                  Edit
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    window.open(getThumbnailUrl(photo.image_id, 1200), '_blank')
+                  }}
+                >
+                  <Eye className="w-3 h-3" />
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-2"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleEdit(photo)}>
+                      <Pencil className="w-4 h-4 mr-2" />
+                      Edit Details
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => window.open(getThumbnailUrl(photo.image_id, 1200), '_blank')}>
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      View Full Size
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleDelete(photo.id)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Delete Photo
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          </div>
+
+          {/* Content */}
+          <CardContent className="p-4 space-y-3">
+            <h3 className="font-semibold text-base line-clamp-1">
+              {photo.title}
+            </h3>
+
+            {/* Meta Info */}
+            {(photo.camera || photo.location || photo.date_taken) && (
+              <div className="space-y-1.5">
+                {photo.camera && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Camera className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="truncate">{photo.camera}</span>
+                  </div>
+                )}
+                {photo.location && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="truncate">{photo.location}</span>
+                  </div>
+                )}
+                {photo.date_taken && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>{new Date(photo.date_taken).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* EXIF Badge */}
+            {(photo.settings && Object.keys(photo.settings).length > 0) && (
+              <Badge variant="secondary" className="text-xs">
+                <Settings className="w-3 h-3 mr-1" />
+                EXIF Data
+              </Badge>
+            )}
+
+            {/* Toggles Section */}
+            <div className="space-y-2 pt-3 border-t">
+              {/* Featured Toggle */}
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">Featured</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground min-w-[50px] text-right">
+                    {photo.featured ? 'Yes' : 'No'}
+                  </span>
+                  <Switch
+                    checked={photo.featured || false}
+                    onCheckedChange={async (checked) => {
+                      try {
+                        const { error } = await supabase
+                          .from('photos')
+                          .update({ featured: checked })
+                          .eq('id', photo.id)
+
+                        if (error) throw error
+                        await fetchPhotos()
+                        toast.success(`Photo ${checked ? 'marked as featured' : 'removed from featured'}`)
+                      } catch (error) {
+                        console.error('Error updating featured status:', error)
+                        toast.error('Failed to update featured status')
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -390,7 +614,7 @@ export default function PhotosManagementPage() {
                         }}
                         currentImageUrl={formData.image_url}
                         currentImageId={formData.image_id}
-                        folder="photos"
+                        folder="rithychanvirak/misc"
                       />
                     </div>
 
@@ -655,129 +879,22 @@ export default function PhotosManagementPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredPhotos.map((photo) => (
-            <Card key={photo.id} className="group overflow-hidden border-0 shadow-md hover:shadow-xl transition-all duration-300">
-              {/* Thumbnail */}
-              <div className="relative aspect-[4/5] bg-muted overflow-hidden">
-                {photo.image_id ? (
-                  <Image
-                    src={getThumbnailUrl(photo.image_id, 600)}
-                    alt={photo.alt || photo.title}
-                    fill
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                    className="object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center bg-muted">
-                    <ImageIcon className="w-12 h-12 text-muted-foreground" />
-                  </div>
-                )}
-
-                {/* Featured Badge */}
-                {photo.featured && (
-                  <div className="absolute top-3 left-3 z-10">
-                    <Badge className="bg-yellow-500 text-white border-0 shadow-lg">
-                      <Star className="w-3 h-3 mr-1 fill-white" />
-                      Featured
-                    </Badge>
-                  </div>
-                )}
-
-                {/* Hover Overlay with Quick Actions */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <div className="absolute bottom-3 left-3 right-3 flex gap-2">
-                    <Button
-                      size="sm"
-                      className="flex-1 bg-white text-black hover:bg-gray-100"
-                      onClick={() => handleEdit(photo)}
-                    >
-                      <Pencil className="w-3 h-3 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-                      onClick={() => window.open(getThumbnailUrl(photo.image_id, 1200), '_blank')}
-                    >
-                      <Eye className="w-3 h-3" />
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-2"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(photo)}>
-                          <Pencil className="w-4 h-4 mr-2" />
-                          Edit Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => window.open(getThumbnailUrl(photo.image_id, 1200), '_blank')}>
-                          <ExternalLink className="w-4 h-4 mr-2" />
-                          View Full Size
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleDelete(photo.id)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <X className="w-4 h-4 mr-2" />
-                          Delete Photo
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              </div>
-
-              {/* Content */}
-              <CardContent className="p-4">
-                <h3 className="font-semibold text-base line-clamp-1 mb-2">
-                  {photo.title}
-                </h3>
-
-                {/* Meta Info */}
-                {(photo.camera || photo.location || photo.date_taken) && (
-                  <div className="space-y-1.5">
-                    {photo.camera && (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Camera className="w-3.5 h-3.5 flex-shrink-0" />
-                        <span className="truncate">{photo.camera}</span>
-                      </div>
-                    )}
-                    {photo.location && (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-                        <span className="truncate">{photo.location}</span>
-                      </div>
-                    )}
-                    {photo.date_taken && (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
-                        <span>{new Date(photo.date_taken).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* EXIF Badge */}
-                {(photo.settings && Object.keys(photo.settings).length > 0) && (
-                  <div className="mt-3 pt-3 border-t">
-                    <Badge variant="secondary" className="text-xs">
-                      <Settings className="w-3 h-3 mr-1" />
-                      EXIF Data
-                    </Badge>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={photos.map(p => p.id)}
+            strategy={rectSortingStrategy}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredPhotos.map((photo) => (
+                <SortablePhotoCard key={photo.id} photo={photo} />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
     </div>
   )
