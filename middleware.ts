@@ -14,9 +14,8 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === '/') {
     supabaseResponse.headers.set('Link', '</gallery>; rel=prefetch, </about>; rel=prefetch, </contact>; rel=prefetch')
-  } else if (pathname === '/gallery') {
-    supabaseResponse.headers.set('Link', '</collection>; rel=prefetch')
   }
+  // Note: Removed /collection prefetch as it's a dynamic route requiring [slug] parameter
 
   return supabaseResponse
 }
