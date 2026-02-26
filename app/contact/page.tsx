@@ -70,24 +70,41 @@ interface ContactData {
 // Icon mapping
 const iconMap: { [key: string]: SimpleIcon | LucideIcon } = {
   Contact: Phone,
+  contact: Phone,
   Phone: Phone,
+  phone: Phone,
   Telegram: siTelegram,
+  telegram: siTelegram,
   MessageCircle: siTelegram,
+  messagecircle: siTelegram,
   Facebook: siFacebook,
+  facebook: siFacebook,
   Instagram: siInstagram,
+  instagram: siInstagram,
   Gmail: siGmail,
-  Mail: Mail
+  gmail: siGmail,
+  Mail: Mail,
+  mail: Mail,
+  email: Mail
 }
 
 // Platform-specific colors
 const platformColors: { [key: string]: string } = {
   Contact: 'from-green-500 to-emerald-600',
+  contact: 'from-green-500 to-emerald-600',
   Phone: 'from-green-500 to-emerald-600',
+  phone: 'from-green-500 to-emerald-600',
   Telegram: 'from-blue-500 to-cyan-600',
+  telegram: 'from-blue-500 to-cyan-600',
   Facebook: 'from-blue-600 to-indigo-700',
+  facebook: 'from-blue-600 to-indigo-700',
   Instagram: 'from-pink-500 to-purple-600',
+  instagram: 'from-pink-500 to-purple-600',
   Gmail: 'from-red-500 to-orange-600',
-  Mail: 'from-gray-600 to-gray-800'
+  gmail: 'from-red-500 to-orange-600',
+  Mail: 'from-gray-600 to-gray-800',
+  mail: 'from-gray-600 to-gray-800',
+  email: 'from-gray-600 to-gray-800'
 }
 
 export default function ContactPage() {
@@ -172,7 +189,9 @@ export default function ContactPage() {
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6"
             >
               {contactData.socialLinks.map((social, index: number) => {
-                const IconComponent = iconMap[social.icon] || Phone
+                const IconComponent = iconMap[social.icon]
+                const hasMappedIcon = Boolean(IconComponent)
+                const customIconText = !hasMappedIcon ? social.icon?.trim() : ''
                 const colorClass = platformColors[social.icon] || platformColors[social.platform] || 'from-gray-500 to-gray-700'
                 let url = social.url || social.link || '#'
 
@@ -207,12 +226,19 @@ export default function ContactPage() {
                       {/* Icon */}
                       <div className="relative mb-4">
                         <div className={`w-16 h-16 mx-auto rounded-xl bg-gradient-to-br ${colorClass} flex items-center justify-center shadow-lg group-hover:shadow-2xl transition-all duration-500 group-hover:scale-110`}>
-                          {'path' in IconComponent ? (
+                          {hasMappedIcon && IconComponent && 'path' in IconComponent ? (
                             <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="currentColor">
                               <path d={IconComponent.path} />
                             </svg>
+                          ) : hasMappedIcon && IconComponent ? (
+                            (() => {
+                              const LucideIconComponent = IconComponent as LucideIcon
+                              return <LucideIconComponent className="w-8 h-8 text-white" />
+                            })()
+                          ) : customIconText ? (
+                            <span className="text-2xl leading-none">{customIconText}</span>
                           ) : (
-                            <IconComponent className="w-8 h-8 text-white" />
+                            <Phone className="w-8 h-8 text-white" />
                           )}
                         </div>
                       </div>

@@ -50,11 +50,15 @@ Create `.env.local` (for local development) or set in your hosting platform:
 ```env
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+# Optional fallback during Supabase key migration
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 # Cloudinary
 NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+# Optional fallback for legacy client-side usage
 NEXT_PUBLIC_CLOUDINARY_API_KEY=your-api-key
 CLOUDINARY_API_SECRET=your-api-secret
 

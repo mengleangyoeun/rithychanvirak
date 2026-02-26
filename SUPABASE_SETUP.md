@@ -21,6 +21,8 @@ Update your `.env` file with your Supabase credentials:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL="your-project-url.supabase.co"
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="your-publishable-key"
+# Optional fallback during Supabase key migration
 NEXT_PUBLIC_SUPABASE_ANON_KEY="your-anon-key"
 SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
 ```

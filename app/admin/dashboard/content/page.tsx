@@ -14,12 +14,109 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CloudinaryUpload } from '@/components/cloudinary-upload'
-import { Loader2, Save, Eye, Settings, User, Mail, MapPin, Globe, Phone, ArrowLeft, Home } from 'lucide-react'
+import { Loader2, Save, Eye, Settings, User, Mail, MapPin, Globe, Phone, ArrowLeft, Home, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import NextImage from 'next/image'
+import { revalidatePublicPaths } from '@/lib/revalidate-client'
+
+type ContactTemplate = {
+  title: string
+  description: string
+  form: {
+    type: ContactInfo['type']
+    label: string
+    value: string
+    icon: string
+  }
+}
+
+type SiteSettingTemplate = {
+  label: string
+  key: string
+  value: string
+  type: SiteSettings['type']
+  description: string
+}
+
+const CONTACT_PRESET_EMOJIS: Record<ContactInfo['type'], string[]> = {
+  email: ['📧', '✉️', '📩'],
+  phone: ['📞', '☎️', '📱'],
+  instagram: ['📸', '🎞️', '✨'],
+  website: ['🌐', '🔗', '🧭'],
+  location: ['📍', '🗺️', '🏢'],
+}
+
+const CONTACT_TEMPLATES: ContactTemplate[] = [
+  {
+    title: 'Business Email',
+    description: 'Primary email contact for inquiries',
+    form: { type: 'email', label: 'Email', value: 'hello@example.com', icon: '📧' },
+  },
+  {
+    title: 'Phone Number',
+    description: 'Direct mobile or office number',
+    form: { type: 'phone', label: 'Phone', value: '+1 555 000 0000', icon: '📞' },
+  },
+  {
+    title: 'Instagram Profile',
+    description: 'Social profile for daily updates',
+    form: { type: 'instagram', label: 'Instagram', value: '@yourhandle', icon: '📸' },
+  },
+  {
+    title: 'Website',
+    description: 'Main portfolio or business website',
+    form: { type: 'website', label: 'Website', value: 'https://example.com', icon: '🌐' },
+  },
+  {
+    title: 'Studio Location',
+    description: 'Public location or city',
+    form: { type: 'location', label: 'Location', value: 'City, Country', icon: '📍' },
+  },
+]
+
+const SITE_SETTING_TEMPLATES: SiteSettingTemplate[] = [
+  {
+    label: 'Footer Brand Title',
+    key: 'footer_brand_title',
+    value: 'Rithy Chanvirak',
+    type: 'string',
+    description: 'Brand title shown in footer.',
+  },
+  {
+    label: 'Footer Description',
+    key: 'footer_brand_description',
+    value: 'Documentary and portrait photographer.',
+    type: 'string',
+    description: 'Short footer description under brand title.',
+  },
+  {
+    label: 'Footer Copyright',
+    key: 'footer_copyright',
+    value: '© 2026 Rithy Chanvirak. All rights reserved.',
+    type: 'string',
+    description: 'Footer copyright text.',
+  },
+  {
+    label: 'Made By Name',
+    key: 'footer_made_by_name',
+    value: 'Built by Team',
+    type: 'string',
+    description: 'Name shown in footer credit.',
+  },
+  {
+    label: 'Made By URL',
+    key: 'footer_made_by_url',
+    value: 'https://example.com',
+    type: 'string',
+    description: 'Link for footer credit.',
+  },
+]
 
 export default function ContentManagementPage() {
   const supabase = createClient()
+  const revalidateContentPages = async () => {
+    await revalidatePublicPaths(['/', '/about', '/contact'])
+  }
 
   // State for different content sections
   const [heroContent, setHeroContent] = useState<HeroContent | null>(null)
@@ -217,6 +314,7 @@ export default function ContentManagementPage() {
     label: '',
     icon: ''
   })
+  const [editingContactId, setEditingContactId] = useState<string | null>(null)
 
   const [settingsForm, setSettingsForm] = useState({
     key: '',
@@ -224,6 +322,7 @@ export default function ContentManagementPage() {
     type: 'string' as SiteSettings['type'],
     description: ''
   })
+  const [editingSettingId, setEditingSettingId] = useState<string | null>(null)
 
   const [experienceForm, setExperienceForm] = useState({
     title: '',
@@ -297,6 +396,7 @@ export default function ContentManagementPage() {
       if (error) throw error
 
       toast.success('Hero content saved successfully')
+      await revalidateContentPages()
       await loadAllContent()
     } catch (error: unknown) {
       console.error('Error saving hero content:', error)
@@ -324,6 +424,7 @@ export default function ContentManagementPage() {
       if (error) throw error
 
       toast.success('Service added successfully')
+      await revalidateContentPages()
       setServiceForm({ number: 0, title: '', description: '', icon: '' })
       await loadAllContent()
     } catch (error: unknown) {
@@ -355,6 +456,7 @@ export default function ContentManagementPage() {
       if (error) throw error
 
       toast.success('About content saved successfully')
+      await revalidateContentPages()
       await loadAllContent()
     } catch (error: unknown) {
       console.error('Error saving about content:', error)
@@ -368,21 +470,32 @@ export default function ContentManagementPage() {
     try {
       setLoading(prev => ({ ...prev, contact: true }))
 
-      const { error } = await supabase
-        .from('contact_info')
-        .insert({
-          type: contactForm.type,
-          value: contactForm.value,
-          label: contactForm.label,
-          icon: contactForm.icon || null,
-          is_active: true,
-          order: contactInfo.length
-        })
+      const payload = {
+        type: contactForm.type,
+        value: contactForm.value,
+        label: contactForm.label,
+        icon: contactForm.icon || null,
+      }
+      const query = editingContactId
+        ? supabase
+            .from('contact_info')
+            .update(payload)
+            .eq('id', editingContactId)
+        : supabase
+            .from('contact_info')
+            .insert({
+              ...payload,
+              is_active: true,
+              order: contactInfo.length
+            })
+      const { error } = await query
 
       if (error) throw error
 
-      toast.success('Contact info added successfully')
+      toast.success(editingContactId ? 'Contact info updated successfully' : 'Contact info added successfully')
+      await revalidateContentPages()
       setContactForm({ type: 'email', value: '', label: '', icon: '' })
+      setEditingContactId(null)
       await loadAllContent()
     } catch (error: unknown) {
       console.error('Error saving contact info:', error)
@@ -396,19 +509,28 @@ export default function ContentManagementPage() {
     try {
       setLoading(prev => ({ ...prev, settings: true }))
 
-      const { error } = await supabase
-        .from('site_settings')
-        .upsert({
-          key: settingsForm.key,
-          value: settingsForm.value || null,
-          type: settingsForm.type,
-          description: settingsForm.description || null
-        })
+      const payload = {
+        key: settingsForm.key,
+        value: settingsForm.value || null,
+        type: settingsForm.type,
+        description: settingsForm.description || null
+      }
+      const query = editingSettingId
+        ? supabase
+            .from('site_settings')
+            .update(payload)
+            .eq('id', editingSettingId)
+        : supabase
+            .from('site_settings')
+            .upsert(payload)
+      const { error } = await query
 
       if (error) throw error
 
-      toast.success('Site setting saved successfully')
+      toast.success(editingSettingId ? 'Site setting updated successfully' : 'Site setting saved successfully')
+      await revalidateContentPages()
       setSettingsForm({ key: '', value: '', type: 'string', description: '' })
+      setEditingSettingId(null)
       await loadAllContent()
     } catch (error: unknown) {
       console.error('Error saving site setting:', error)
@@ -436,6 +558,7 @@ export default function ContentManagementPage() {
       if (error) throw error
 
       toast.success('Experience added successfully')
+      await revalidateContentPages()
       setExperienceForm({ title: '', organization: '', period: '', description: '' })
       await loadAllContent()
     } catch (error: unknown) {
@@ -462,6 +585,7 @@ export default function ContentManagementPage() {
       if (error) throw error
 
       toast.success('Skill added successfully')
+      await revalidateContentPages()
       setSkillForm({ name: '', icon: '' })
       await loadAllContent()
     } catch (error: unknown) {
@@ -489,6 +613,7 @@ export default function ContentManagementPage() {
       if (error) throw error
 
       toast.success('Award added successfully')
+      await revalidateContentPages()
       setAwardForm({ title: '', organization: '', year: '' })
       await loadAllContent()
     } catch (error: unknown) {
@@ -514,6 +639,7 @@ export default function ContentManagementPage() {
       if (error) throw error
 
       toast.success('Equipment category added successfully')
+      await revalidateContentPages()
       setEquipmentCategoryForm({ category: '' })
       await loadAllContent()
     } catch (error: unknown) {
@@ -539,6 +665,7 @@ export default function ContentManagementPage() {
       if (error) throw error
 
       toast.success('Equipment item added successfully')
+      await revalidateContentPages()
       setEquipmentItemForm({ item: '', equipment_category_id: '' })
       await loadAllContent()
     } catch (error: unknown) {
@@ -559,6 +686,65 @@ export default function ContentManagementPage() {
       case 'location': return MapPin
       default: return Settings
     }
+  }
+
+  const applyContactTemplate = (template: ContactTemplate) => {
+    setContactForm(template.form)
+  }
+
+  const applyContactTypePreset = (type: ContactInfo['type']) => {
+    const defaultLabelByType: Record<ContactInfo['type'], string> = {
+      email: 'Email',
+      phone: 'Phone',
+      instagram: 'Instagram',
+      website: 'Website',
+      location: 'Location',
+    }
+    setContactForm((prev) => ({
+      ...prev,
+      type,
+      label: prev.label || defaultLabelByType[type],
+      icon: prev.icon || CONTACT_PRESET_EMOJIS[type][0],
+    }))
+  }
+
+  const applySiteSettingTemplate = (template: SiteSettingTemplate) => {
+    setSettingsForm({
+      key: template.key,
+      value: template.value,
+      type: template.type,
+      description: template.description,
+    })
+  }
+
+  const startEditContact = (contact: ContactInfo) => {
+    setEditingContactId(contact.id)
+    setContactForm({
+      type: contact.type,
+      value: contact.value,
+      label: contact.label,
+      icon: contact.icon || '',
+    })
+  }
+
+  const cancelEditContact = () => {
+    setEditingContactId(null)
+    setContactForm({ type: 'email', value: '', label: '', icon: '' })
+  }
+
+  const startEditSiteSetting = (setting: SiteSettings) => {
+    setEditingSettingId(setting.id)
+    setSettingsForm({
+      key: setting.key,
+      value: setting.value || '',
+      type: setting.type,
+      description: setting.description || '',
+    })
+  }
+
+  const cancelEditSiteSetting = () => {
+    setEditingSettingId(null)
+    setSettingsForm({ key: '', value: '', type: 'string', description: '' })
   }
 
   return (
@@ -882,6 +1068,7 @@ CREATE TABLE services (
                                       .eq('id', service.id)
 
                                     if (error) throw error
+                                    await revalidateContentPages()
                                     await loadAllContent()
                                     toast.success(`Service ${checked ? 'activated' : 'deactivated'}`)
                                   } catch (error) {
@@ -1020,13 +1207,42 @@ CREATE TABLE services (
             <CardContent className="space-y-6">
               {/* Add New Contact */}
               <div className="border rounded-lg p-4 space-y-4">
-                <h3 className="font-semibold">Add Contact Info</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="font-semibold">{editingContactId ? 'Edit Contact Info' : 'Add Contact Info'}</h3>
+                  <div className="flex items-center gap-2">
+                    {editingContactId && (
+                      <Badge variant="default">Editing</Badge>
+                    )}
+                    <Badge variant="secondary" className="gap-1">
+                      <Sparkles className="h-3 w-3" />
+                      Presets enabled
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Quick Start Templates</Label>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                    {CONTACT_TEMPLATES.map((template) => (
+                      <button
+                        key={template.title}
+                        type="button"
+                        onClick={() => applyContactTemplate(template)}
+                        className="rounded-lg border bg-muted/30 p-3 text-left transition hover:bg-muted"
+                      >
+                        <div className="font-medium text-sm">{template.title}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{template.description}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="contact-type">Type</Label>
                     <Select
                       value={contactForm.type}
-                      onValueChange={(value: ContactInfo['type']) => setContactForm(prev => ({ ...prev, type: value }))}
+                      onValueChange={(value: ContactInfo['type']) => applyContactTypePreset(value)}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -1047,19 +1263,33 @@ CREATE TABLE services (
                       id="contact-icon"
                       value={contactForm.icon}
                       onChange={(e) => setContactForm(prev => ({ ...prev, icon: e.target.value }))}
-                      placeholder="📧"
+                      placeholder=":emoji:"
                     />
+                    <div className="flex flex-wrap gap-2">
+                      {CONTACT_PRESET_EMOJIS[contactForm.type].map((emoji) => (
+                        <button
+                          key={`${contactForm.type}-${emoji}`}
+                          type="button"
+                          className={`rounded-md border px-2 py-1 text-sm transition ${
+                            contactForm.icon === emoji ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-muted'
+                          }`}
+                          onClick={() => setContactForm((prev) => ({ ...prev, icon: emoji }))}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="contact-label">Label</Label>
                     <Input
                       id="contact-label"
                       value={contactForm.label}
                       onChange={(e) => setContactForm(prev => ({ ...prev, label: e.target.value }))}
-                      placeholder="Email"
+                      placeholder="Contact label"
                     />
                   </div>
 
@@ -1069,21 +1299,32 @@ CREATE TABLE services (
                       id="contact-value"
                       value={contactForm.value}
                       onChange={(e) => setContactForm(prev => ({ ...prev, value: e.target.value }))}
-                      placeholder="hello@example.com"
+                      placeholder="Contact value"
                     />
                   </div>
                 </div>
 
-                <Button
-                  onClick={saveContactInfo}
-                  disabled={loading.contact || !contactForm.label.trim() || !contactForm.value.trim()}
-                  className="w-full md:w-auto"
-                >
-                  {loading.contact && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Add Contact Info
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    onClick={saveContactInfo}
+                    disabled={loading.contact || !contactForm.label.trim() || !contactForm.value.trim()}
+                    className="w-full md:w-auto"
+                  >
+                    {loading.contact && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    {editingContactId ? 'Update Contact Info' : 'Add Contact Info'}
+                  </Button>
+                  {editingContactId && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={cancelEditContact}
+                      className="w-full md:w-auto"
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </div>
               </div>
-
               {/* Existing Contact Info */}
               <div className="space-y-4">
                 <h3 className="font-semibold">Contact Information</h3>
@@ -1121,6 +1362,7 @@ CREATE TABLE services (
                                         .eq('id', contact.id)
 
                                       if (error) throw error
+                                      await revalidateContentPages()
                                       await loadAllContent()
                                       toast.success(`Contact info ${checked ? 'activated' : 'deactivated'}`)
                                     } catch (error) {
@@ -1129,7 +1371,7 @@ CREATE TABLE services (
                                     }
                                   }}
                                 />
-                                <Button variant="outline" size="sm">
+                                <Button variant="outline" size="sm" onClick={() => startEditContact(contact)}>
                                   Edit
                                 </Button>
                               </div>
@@ -1562,7 +1804,36 @@ CREATE TABLE services (
             <CardContent className="space-y-6">
               {/* Add New Setting */}
               <div className="border rounded-lg p-4 space-y-4">
-                <h3 className="font-semibold">Add Site Setting</h3>
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="font-semibold">{editingSettingId ? 'Edit Site Setting' : 'Add Site Setting'}</h3>
+                  <div className="flex items-center gap-2">
+                    {editingSettingId && (
+                      <Badge variant="default">Editing</Badge>
+                    )}
+                    <Badge variant="secondary" className="gap-1">
+                      <Sparkles className="h-3 w-3" />
+                      Templates available
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Common Footer Presets</Label>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                    {SITE_SETTING_TEMPLATES.map((template) => (
+                      <button
+                        key={template.key}
+                        type="button"
+                        onClick={() => applySiteSettingTemplate(template)}
+                        className="rounded-lg border bg-muted/30 p-3 text-left transition hover:bg-muted"
+                      >
+                        <div className="font-medium text-sm">{template.label}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{template.key}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="setting-key">Setting Key</Label>
@@ -1613,16 +1884,27 @@ CREATE TABLE services (
                   />
                 </div>
 
-                <Button
-                  onClick={saveSiteSetting}
-                  disabled={loading.settings || !settingsForm.key.trim()}
-                  className="w-full md:w-auto"
-                >
-                  {loading.settings && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Add Setting
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    onClick={saveSiteSetting}
+                    disabled={loading.settings || !settingsForm.key.trim()}
+                    className="w-full md:w-auto"
+                  >
+                    {loading.settings && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    {editingSettingId ? 'Update Setting' : 'Add Setting'}
+                  </Button>
+                  {editingSettingId && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={cancelEditSiteSetting}
+                      className="w-full md:w-auto"
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </div>
               </div>
-
               {/* Existing Settings */}
               <div className="space-y-4">
                 <h3 className="font-semibold">Site Settings</h3>
@@ -1644,7 +1926,7 @@ CREATE TABLE services (
                             </div>
                             <div className="flex items-center gap-2">
                               <Badge variant="default">Active</Badge>
-                              <Button variant="outline" size="sm">
+                              <Button variant="outline" size="sm" onClick={() => startEditSiteSetting(setting)}>
                                 Edit
                               </Button>
                             </div>

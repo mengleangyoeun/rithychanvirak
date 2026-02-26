@@ -217,7 +217,6 @@ export function FullscreenPhotoPreview({
     try {
       // MOBILE & MODERN BROWSERS: Use native share
       if (navigator.share) {
-        console.log('Opening native share dialog...')
 
         // Check if browser supports sharing files
         const canShareFiles = navigator.canShare && navigator.canShare({ files: [] })
@@ -232,32 +231,26 @@ export function FullscreenPhotoPreview({
 
             // Check if we can share this specific file
             if (navigator.canShare({ files: [file] })) {
-              console.log('Sharing with image file...')
               await navigator.share({
                 title: photo.title,
                 text: `Check out this photo: ${photo.title}`,
                 url: photoUrl,
                 files: [file]
               })
-              console.log('Share successful!')
               return
             }
-          } catch (fileError) {
-            console.log('Sharing with file failed, falling back to URL only:', fileError)
+          } catch {
           }
         }
 
         // Share without image (URL only) - this opens WhatsApp, Email, etc.
-        console.log('Sharing URL only...')
         await navigator.share({
           title: photo.title,
           text: `Check out this photo: ${photo.title}`,
           url: photoUrl
         })
-        console.log('Share successful!')
       } else {
         // DESKTOP FALLBACK: Copy to clipboard (no native share on most desktop browsers)
-        console.log('Native share not available, copying to clipboard...')
         await navigator.clipboard.writeText(photoUrl)
         alert('📋 Photo link copied to clipboard!\n\nYou can now paste it to share.')
       }
@@ -424,7 +417,6 @@ export function FullscreenPhotoPreview({
                 className="max-w-full max-h-[calc(100vh-160px)] md:max-h-[calc(100vh-200px)] w-auto h-auto object-contain md:rounded-lg md:shadow-2xl"
                 style={{ touchAction: 'none' }}
                 onLoad={() => {
-                  console.log('Image loaded successfully:', getOptimizedImageUrl(photo.imageId, 1920))
                   setIsLoading(false)
                 }}
                 onError={(e) => {

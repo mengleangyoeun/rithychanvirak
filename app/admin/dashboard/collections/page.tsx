@@ -4,11 +4,13 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Collection, Photo, CollectionPhoto } from '@/types/database'
 import { getCollectionFolder } from '@/lib/cloudinary-folders'
+import { revalidatePublicPaths } from '@/lib/revalidate-client'
 
 interface CollectionPhotoWithPhoto extends CollectionPhoto {
   photos: Photo
 }
 import { CloudinaryBulkUpload } from '@/components/cloudinary-bulk-upload'
+import { CloudinaryUpload } from '@/components/cloudinary-upload'
 
 interface UploadedImage {
   image_id: string
@@ -44,7 +46,7 @@ import {
 } from 'lucide-react'
 import Image from 'next/image'
 import { toast } from 'sonner'
-import { getThumbnailUrl } from '@/lib/cloudinary'
+import { getOptimizedImageUrl, getThumbnailUrl } from '@/lib/cloudinary'
 import {
   DndContext,
   closestCenter,
@@ -73,6 +75,7 @@ function SortableCollectionItem({
   item,
   selectedItems,
   setSelectedItems,
+  dragDisabled,
   onEdit,
   onDelete,
   onRename,
@@ -82,6 +85,7 @@ function SortableCollectionItem({
   item: FileExplorerItem
   selectedItems: Set<string>
   setSelectedItems: (items: Set<string>) => void
+  dragDisabled: boolean
   onEdit: (item: FileExplorerItem) => void
   onDelete: (itemId: string) => void
   onRename: (item: FileExplorerItem) => void
@@ -95,7 +99,7 @@ function SortableCollectionItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: item.id })
+  } = useSortable({ id: item.id, disabled: dragDisabled })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -108,7 +112,7 @@ function SortableCollectionItem({
         <div
           ref={setNodeRef}
           style={style}
-          className={`group relative rounded-lg border cursor-pointer hover:shadow-lg transition-all duration-200 ${
+          className={`group relative rounded-xl border cursor-pointer hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 ease-out ${
             selectedItems.has(item.id) ? 'bg-accent border-primary shadow-md' : 'border-border hover:border-primary/50'
           } ${isDragging ? 'opacity-50' : ''}`}
           onClick={(e) => {
@@ -132,7 +136,11 @@ function SortableCollectionItem({
             data-drag-handle
             {...attributes}
             {...listeners}
-            className="absolute top-2 right-2 z-10 w-6 h-6 flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-black/20 rounded"
+            className={`absolute top-2 right-2 z-10 w-6 h-6 flex items-center justify-center rounded ${
+              dragDisabled
+                ? 'cursor-not-allowed opacity-40'
+                : 'cursor-grab active:cursor-grabbing hover:bg-black/20'
+            }`}
           >
             <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
               <path d="M3 4h14a1 1 0 010 2H3a1 1 0 010-2zM3 8h14a1 1 0 010 2H3a1 1 0 010-2zM3 12h14a1 1 0 010 2H3a1 1 0 010-2z"/>
@@ -167,7 +175,7 @@ function SortableCollectionItem({
             </div>
           </div>
 
-          <div className="aspect-[4/3] relative overflow-hidden rounded-t-lg bg-muted">
+          <div className="aspect-[4/3] relative overflow-hidden rounded-t-xl bg-muted">
             {item.type === 'folder' ? (
               item.data && 'cover_image_url' in item.data && item.data.cover_image_url ? (
                 <Image
@@ -187,8 +195,8 @@ function SortableCollectionItem({
               </div>
             )}
           </div>
-          <div className="p-3 bg-background rounded-b-lg">
-            <p className="text-sm font-medium text-center truncate" title={item.name}>
+          <div className="p-3 bg-background rounded-b-xl">
+            <p className="text-sm font-semibold tracking-tight text-center truncate" title={item.name}>
               {item.name}
             </p>
             {item.type === 'folder' && (
@@ -237,6 +245,12 @@ interface FileExplorerItem {
 
 export default function CollectionsPage() {
   const supabase = createClient()
+  const getCurrentCollectionPublicPath = () => {
+    const currentCollectionId = currentPath.length > 0 ? currentPath[currentPath.length - 1] : null
+    if (!currentCollectionId) return null
+    const currentCollection = allCollections.find((collection) => collection.id === currentCollectionId)
+    return currentCollection ? `/collection/${currentCollection.slug}` : null
+  }
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -248,9 +262,19 @@ export default function CollectionsPage() {
 
   // Handle drag end
   function handleDragEnd(event: DragEndEvent) {
+    if (searchQuery.trim().length > 0 || selectedItems.size > 0 || loadingStates.renaming || loadingStates.deleting) {
+      return
+    }
+
     const { active, over } = event
 
     if (over && active.id !== over.id) {
+      const activeItem = currentItems.find((item) => item.id === active.id)
+      const overItem = currentItems.find((item) => item.id === over.id)
+      if (!activeItem || !overItem || activeItem.type !== 'folder' || overItem.type !== 'folder') {
+        return
+      }
+
       const oldIndex = currentItems.findIndex((item) => item.id === active.id)
       const newIndex = currentItems.findIndex((item) => item.id === over.id)
 
@@ -265,7 +289,8 @@ export default function CollectionsPage() {
   // Update collection order in database
   const updateCollectionOrder = async (items: FileExplorerItem[]) => {
     try {
-      const updates = items.map((item, index) => ({
+      const folderItems = items.filter((item) => item.type === 'folder')
+      const updates = folderItems.map((item, index) => ({
         id: item.id,
         order: index
       }))
@@ -277,17 +302,7 @@ export default function CollectionsPage() {
           .eq('id', update.id)
       }
 
-      // Revalidate homepage to show new order immediately
-      try {
-        await fetch('/api/revalidate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: '/' })
-        })
-      } catch (revalidateError) {
-        console.warn('Failed to revalidate homepage:', revalidateError)
-        // Don't fail the whole operation if revalidation fails
-      }
+      await revalidatePublicPaths(['/', '/gallery'])
 
       toast.success('Collection order updated')
     } catch (error: unknown) {
@@ -310,9 +325,13 @@ export default function CollectionsPage() {
   const [collectionPhotos, setCollectionPhotos] = useState<Photo[]>([])
   const [showPhotoUpload, setShowPhotoUpload] = useState(false)
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null)
+  const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set())
   const [showPhotoPreview, setShowPhotoPreview] = useState(false)
   const [showPhotoEdit, setShowPhotoEdit] = useState(false)
   const [editingPhoto, setEditingPhoto] = useState<Photo | null>(null)
+  const [photoDeleteProgress, setPhotoDeleteProgress] = useState<{ current: number; total: number } | null>(null)
+  const [photoRenderCount, setPhotoRenderCount] = useState(120)
+  const [isToolbarElevated, setIsToolbarElevated] = useState(false)
 
   // UI state
   const [showCreateFolder, setShowCreateFolder] = useState(false)
@@ -335,7 +354,9 @@ export default function CollectionsPage() {
     parent_id: '',
     featured: false
   })
-  const [availableImages, setAvailableImages] = useState<Photo[]>([])
+  const [coverCollectionImages, setCoverCollectionImages] = useState<Photo[]>([])
+  const [coverAllImages, setCoverAllImages] = useState<Photo[]>([])
+  const [coverImagesLoading, setCoverImagesLoading] = useState(false)
   const [showImageSelector, setShowImageSelector] = useState(false)
 
   // Loading states
@@ -357,9 +378,8 @@ export default function CollectionsPage() {
       setLoadingStates(prev => ({ ...prev, loading: true }))
 
       // Parallel data loading
-      const [collectionsResult, imagesResult] = await Promise.allSettled([
-        supabase.from('collections').select('*').order('created_at', { ascending: false }),
-        supabase.from('photos').select('*').order('created_at', { ascending: false }).limit(50)
+      const [collectionsResult] = await Promise.allSettled([
+        supabase.from('collections').select('*').order('created_at', { ascending: false })
       ])
 
       // Handle collections
@@ -368,14 +388,6 @@ export default function CollectionsPage() {
       } else {
         console.error('Error loading collections:', collectionsResult.reason)
         setError('Failed to load collections')
-      }
-
-      // Handle available images
-      if (imagesResult.status === 'fulfilled') {
-        setAvailableImages(imagesResult.value.data || [])
-      } else {
-        console.error('Error loading available images:', imagesResult.reason)
-        // Don't set error for images as it's not critical
       }
 
     } catch (err) {
@@ -390,12 +402,52 @@ export default function CollectionsPage() {
     loadInitialData()
   }, [loadInitialData])
 
+  // Keep selection aligned with currently visible items.
+  useEffect(() => {
+    setSelectedItems((prev) => {
+      if (prev.size === 0) return prev
+      const visibleIds = new Set(currentItems.map((item) => item.id))
+      const next = new Set(Array.from(prev).filter((id) => visibleIds.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [currentItems])
+
+  // Keep selected photos aligned with currently loaded collection photos.
+  useEffect(() => {
+    setSelectedPhotos((prev) => {
+      if (prev.size === 0) return prev
+      const visibleIds = new Set(collectionPhotos.map((photo) => photo.id))
+      const next = new Set(Array.from(prev).filter((id) => visibleIds.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [collectionPhotos])
+
   // Update current items when path or collections change
   useEffect(() => {
     updateCurrentItems()
     loadCollectionPhotos()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPath, allCollections, searchQuery])
+
+  // Subtle sticky-toolbar elevation after scroll for better visual separation.
+  useEffect(() => {
+    const onScroll = () => {
+      setIsToolbarElevated(window.scrollY > 12)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  // Performance: render photos incrementally for very large albums.
+  useEffect(() => {
+    setPhotoRenderCount(120)
+  }, [currentPath, collectionPhotos.length])
+
+  const renderedCollectionPhotos = useMemo(
+    () => collectionPhotos.slice(0, photoRenderCount),
+    [collectionPhotos, photoRenderCount]
+  )
 
 
   // Core functions
@@ -498,17 +550,20 @@ export default function CollectionsPage() {
   const navigateToPath = (pathIndex: number) => {
     setCurrentPath(currentPath.slice(0, pathIndex))
     setSelectedItems(new Set())
+    setSelectedPhotos(new Set())
   }
 
   const openFolder = (folderId: string) => {
     setCurrentPath([...currentPath, folderId])
     setSelectedItems(new Set())
+    setSelectedPhotos(new Set())
   }
 
   const goUp = () => {
     if (currentPath.length > 0) {
       setCurrentPath(currentPath.slice(0, -1))
       setSelectedItems(new Set())
+      setSelectedPhotos(new Set())
     }
   }
 
@@ -531,6 +586,7 @@ export default function CollectionsPage() {
       if (error) throw error
 
       toast.success('Folder created successfully')
+      await revalidatePublicPaths(['/', '/gallery'])
       setNewFolderName('')
       setShowCreateFolder(false)
       await loadAllCollections()
@@ -562,6 +618,7 @@ export default function CollectionsPage() {
       }
 
       toast.success('Renamed successfully')
+      await revalidatePublicPaths(['/', '/gallery'])
       setRenamingItem(null)
       setRenameValue('')
       setShowRenameDialog(false)
@@ -596,6 +653,7 @@ export default function CollectionsPage() {
       if (error) throw error
 
       toast.success('Collection updated successfully')
+      await revalidatePublicPaths(['/', '/gallery'])
       setEditingItem(null)
       setEditFormData({ title: '', description: '', cover_image_url: '', parent_id: '', featured: false })
       setShowEditDialog(false)
@@ -628,6 +686,7 @@ export default function CollectionsPage() {
       }
 
       toast.success(`${itemIds.length} item${itemIds.length > 1 ? 's' : ''} deleted`)
+      await revalidatePublicPaths(['/', '/gallery'])
       setSelectedItems(new Set())
       await loadAllCollections()
     } catch (error: unknown) {
@@ -655,6 +714,7 @@ export default function CollectionsPage() {
       if (error) throw error
 
       toast.success(`${selectedItems.size} collection${selectedItems.size > 1 ? 's' : ''} moved successfully`)
+      await revalidatePublicPaths(['/', '/gallery'])
       setSelectedItems(new Set())
       setBulkMoveTarget('')
       setShowBulkMoveDialog(false)
@@ -716,6 +776,9 @@ export default function CollectionsPage() {
       }
 
       toast.success(`${uploadedImages.length} photo${uploadedImages.length > 1 ? 's' : ''} added to collection`)
+      await revalidatePublicPaths(
+        ['/', '/gallery', getCurrentCollectionPublicPath()].filter((path): path is string => Boolean(path))
+      )
       await loadCollectionPhotos()
       setShowPhotoUpload(false)
     } catch (error: unknown) {
@@ -737,11 +800,149 @@ export default function CollectionsPage() {
       if (error) throw error
 
       toast.success('Photo removed from collection')
+      await revalidatePublicPaths(
+        ['/', '/gallery', getCurrentCollectionPublicPath()].filter((path): path is string => Boolean(path))
+      )
       await loadCollectionPhotos()
+      setSelectedPhotos((prev) => {
+        if (!prev.has(photoId)) return prev
+        const next = new Set(prev)
+        next.delete(photoId)
+        return next
+      })
     } catch (error: unknown) {
       console.error('Error removing photo:', error)
       toast.error('Failed to remove photo')
     }
+  }
+
+  const permanentlyDeletePhoto = async (photo: Photo) => {
+    if (!confirm('Permanently delete this photo from Cloudinary and database?')) return
+
+    try {
+      setLoadingStates(prev => ({ ...prev, deleting: true }))
+
+      const cloudinaryResponse = await fetch('/api/cloudinary/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ publicIds: [photo.image_id] }),
+      })
+
+      if (!cloudinaryResponse.ok) {
+        throw new Error('Failed to delete image from Cloudinary')
+      }
+
+      const { error } = await supabase
+        .from('photos')
+        .delete()
+        .eq('id', photo.id)
+
+      if (error) throw error
+
+      toast.success('Photo permanently deleted')
+      await revalidatePublicPaths(
+        ['/', '/gallery', getCurrentCollectionPublicPath()].filter((path): path is string => Boolean(path))
+      )
+      await loadCollectionPhotos()
+    } catch (error: unknown) {
+      console.error('Permanent photo delete error:', error)
+      toast.error('Failed to permanently delete photo')
+    } finally {
+      setLoadingStates(prev => ({ ...prev, deleting: false }))
+    }
+  }
+
+  const removeSelectedPhotosFromCollection = async () => {
+    if (selectedPhotos.size === 0 || currentPath.length === 0) return
+    if (!confirm(`Remove ${selectedPhotos.size} photo${selectedPhotos.size > 1 ? 's' : ''} from this collection?`)) return
+
+    try {
+      setLoadingStates(prev => ({ ...prev, deleting: true }))
+
+      const { error } = await supabase
+        .from('collection_photos')
+        .delete()
+        .eq('collection_id', currentPath[currentPath.length - 1])
+        .in('photo_id', Array.from(selectedPhotos))
+
+      if (error) throw error
+
+      toast.success(`${selectedPhotos.size} photo${selectedPhotos.size > 1 ? 's' : ''} removed from collection`)
+      await revalidatePublicPaths(
+        ['/', '/gallery', getCurrentCollectionPublicPath()].filter((path): path is string => Boolean(path))
+      )
+      setSelectedPhotos(new Set())
+      await loadCollectionPhotos()
+    } catch (error: unknown) {
+      console.error('Error removing selected photos:', error)
+      toast.error('Failed to remove selected photos')
+    } finally {
+      setLoadingStates(prev => ({ ...prev, deleting: false }))
+    }
+  }
+
+  const permanentlyDeleteSelectedPhotos = async () => {
+    if (selectedPhotos.size === 0) return
+
+    const selectedPhotoRows = collectionPhotos.filter((photo) => selectedPhotos.has(photo.id))
+    if (selectedPhotoRows.length === 0) return
+
+    if (!confirm(`Permanently delete ${selectedPhotoRows.length} photo${selectedPhotoRows.length > 1 ? 's' : ''} from Cloudinary and database?`)) return
+
+    try {
+      setLoadingStates(prev => ({ ...prev, deleting: true }))
+      setPhotoDeleteProgress({ current: 0, total: selectedPhotoRows.length })
+
+      const CHUNK_SIZE = 25
+      for (let start = 0; start < selectedPhotoRows.length; start += CHUNK_SIZE) {
+        const chunk = selectedPhotoRows.slice(start, start + CHUNK_SIZE)
+        const publicIds = chunk
+          .map((photo) => photo.image_id)
+          .filter((id): id is string => Boolean(id))
+
+        const cloudinaryResponse = await fetch('/api/cloudinary/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ publicIds }),
+        })
+
+        if (!cloudinaryResponse.ok) {
+          throw new Error('Failed to delete one or more images from Cloudinary')
+        }
+
+        const photoIds = chunk.map((photo) => photo.id)
+        const { error } = await supabase
+          .from('photos')
+          .delete()
+          .in('id', photoIds)
+
+        if (error) throw error
+
+        setPhotoDeleteProgress({ current: Math.min(start + chunk.length, selectedPhotoRows.length), total: selectedPhotoRows.length })
+      }
+
+      toast.success(`${selectedPhotoRows.length} photo${selectedPhotoRows.length > 1 ? 's' : ''} permanently deleted`)
+      await revalidatePublicPaths(
+        ['/', '/gallery', getCurrentCollectionPublicPath()].filter((path): path is string => Boolean(path))
+      )
+      setSelectedPhotos(new Set())
+      await loadCollectionPhotos()
+    } catch (error: unknown) {
+      console.error('Permanent selected photo delete error:', error)
+      toast.error('Failed to permanently delete selected photos')
+    } finally {
+      setLoadingStates(prev => ({ ...prev, deleting: false }))
+      setPhotoDeleteProgress(null)
+    }
+  }
+
+  const toggleSelectAllPhotos = () => {
+    if (collectionPhotos.length === 0) return
+    if (selectedPhotos.size === collectionPhotos.length) {
+      setSelectedPhotos(new Set())
+      return
+    }
+    setSelectedPhotos(new Set(collectionPhotos.map((photo) => photo.id)))
   }
 
   const updatePhoto = async () => {
@@ -772,6 +973,9 @@ export default function CollectionsPage() {
       if (error) throw error
 
       toast.success('Photo updated successfully')
+      await revalidatePublicPaths(
+        ['/', '/gallery', getCurrentCollectionPublicPath()].filter((path): path is string => Boolean(path))
+      )
       setEditingPhoto(null)
       setShowPhotoEdit(false)
       await loadCollectionPhotos()
@@ -784,10 +988,57 @@ export default function CollectionsPage() {
   }
 
   const toggleSelectAll = () => {
-    if (selectedItems.size === currentItems.length) {
+    const selectableIds = currentItems
+      .filter((item) => item.type === 'folder')
+      .map((item) => item.id)
+
+    if (selectableIds.length > 0 && selectedItems.size === selectableIds.length) {
       setSelectedItems(new Set())
     } else {
-      setSelectedItems(new Set(currentItems.map(item => item.id)))
+      setSelectedItems(new Set(selectableIds))
+    }
+  }
+
+  const openCoverImageSelector = async () => {
+    if (!editingItem || editingItem.type !== 'folder') {
+      setShowImageSelector(true)
+      return
+    }
+
+    try {
+      setCoverImagesLoading(true)
+      setShowImageSelector(true)
+
+      const [allPhotosResult, collectionPhotosResult] = await Promise.all([
+        supabase
+          .from('photos')
+          .select('*')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('collection_photos')
+          .select(`
+            photos (*)
+          `)
+          .eq('collection_id', editingItem.id)
+          .order('order', { ascending: true })
+      ])
+
+      if (allPhotosResult.error) throw allPhotosResult.error
+      if (collectionPhotosResult.error) throw collectionPhotosResult.error
+
+      const inCollection = (collectionPhotosResult.data as unknown as CollectionPhotoWithPhoto[] | null)
+        ?.map((item) => item.photos)
+        .filter(Boolean) || []
+
+      setCoverCollectionImages(inCollection)
+      setCoverAllImages(allPhotosResult.data || [])
+    } catch (error) {
+      console.error('Error loading cover selector images:', error)
+      toast.error('Failed to load images for cover selection')
+      setCoverCollectionImages([])
+      setCoverAllImages([])
+    } finally {
+      setCoverImagesLoading(false)
     }
   }
 
@@ -795,10 +1046,10 @@ export default function CollectionsPage() {
 
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col bg-gradient-to-b from-background to-muted/20">
       {/* Error Display */}
       {error && (
-        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 m-4">
+        <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 m-4 shadow-sm">
           <div className="flex items-center gap-2 text-destructive">
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
@@ -821,33 +1072,45 @@ export default function CollectionsPage() {
       )}
 
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 p-4 border-b bg-background">
+      <div className={`sticky top-0 z-30 m-4 mb-2 rounded-xl border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 p-3 sm:p-4 transition-shadow duration-200 ${
+        isToolbarElevated ? 'shadow-lg' : 'shadow-sm'
+      }`}>
+        <div className="mb-3">
+          <h2 className="text-lg sm:text-xl font-semibold tracking-tight">Collections Manager</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+            Organize albums, manage cover images, and maintain collection structure.
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
         {/* Top row on mobile: Navigation + Breadcrumbs */}
-        <div className="flex items-center gap-2 w-full sm:w-auto sm:flex-1">
+        <div className="flex items-center gap-2 w-full sm:w-auto sm:flex-1 min-w-0">
           {/* Navigation buttons */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             <Button
               variant="outline"
               size="sm"
               onClick={goUp}
               disabled={currentPath.length === 0}
+              className="h-9 w-9 p-0"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4 shrink-0" />
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => navigateToPath(0)}
+              className="h-9 w-9 p-0"
             >
-              <Home className="w-4 h-4" />
+              <Home className="w-4 h-4 shrink-0" />
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={loadAllCollections}
               disabled={loadingStates.loading}
+              className="h-9 w-9 p-0"
             >
-              <RefreshCw className={`w-4 h-4 ${loadingStates.loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 shrink-0 ${loadingStates.loading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
 
@@ -880,9 +1143,9 @@ export default function CollectionsPage() {
         </div>
 
         {/* Bottom row on mobile: Search, View mode, Select All, Actions */}
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
           {/* Search */}
-          <div className="relative flex-1 sm:flex-none">
+          <div className="relative flex-1 min-w-[220px] sm:flex-none">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search files and folders..."
@@ -900,15 +1163,17 @@ export default function CollectionsPage() {
               variant={viewMode === 'grid' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setViewMode('grid')}
+              className="h-9 w-9 p-0"
             >
-              <Grid3X3 className="w-4 h-4" />
+              <Grid3X3 className="w-4 h-4 shrink-0" />
             </Button>
             <Button
               variant={viewMode === 'list' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setViewMode('list')}
+              className="h-9 w-9 p-0"
             >
-              <List className="w-4 h-4" />
+              <List className="w-4 h-4 shrink-0" />
             </Button>
           </div>
 
@@ -919,7 +1184,10 @@ export default function CollectionsPage() {
             <input
               type="checkbox"
               id="select-all"
-              checked={selectedItems.size === currentItems.length && currentItems.length > 0}
+              checked={
+                selectedItems.size > 0 &&
+                selectedItems.size === currentItems.filter((item) => item.type === 'folder').length
+              }
               onChange={toggleSelectAll}
               className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
             />
@@ -931,24 +1199,25 @@ export default function CollectionsPage() {
           <Separator orientation="vertical" className="h-6 hidden sm:block" />
 
           {/* Actions */}
-          <div className="flex gap-1 sm:gap-2">
-            <Button onClick={() => setShowCreateFolder(true)} size="sm" className="text-xs sm:text-sm">
+          <div className="flex gap-1 sm:gap-2 ml-auto sm:ml-0">
+            <Button onClick={() => setShowCreateFolder(true)} size="sm" className="h-9 text-xs sm:text-sm font-medium">
               <Plus className="w-4 h-4 sm:mr-2" />
               <span className="hidden sm:inline">New Folder</span>
             </Button>
             {currentPath.length > 0 && (
-              <Button onClick={() => setShowPhotoUpload(true)} variant="outline" size="sm" className="text-xs sm:text-sm">
+              <Button onClick={() => setShowPhotoUpload(true)} variant="outline" size="sm" className="h-9 text-xs sm:text-sm font-medium">
                 <FileImage className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Add Photos</span>
               </Button>
             )}
           </div>
         </div>
+        </div>
       </div>
 
       {/* Bulk Actions Toolbar */}
       {selectedItems.size > 0 && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 p-3 border-b bg-muted/50">
+        <div className="mx-4 mb-2 flex flex-col sm:flex-row items-start sm:items-center gap-2 p-3 rounded-xl border bg-muted/50 shadow-sm">
           <span className="text-sm font-medium">
             {selectedItems.size} item{selectedItems.size > 1 ? 's' : ''} selected
           </span>
@@ -986,29 +1255,47 @@ export default function CollectionsPage() {
         </div>
       )}
 
+      {(searchQuery.trim().length > 0 || selectedItems.size > 0) && (
+        <div className="mx-4 mb-2 p-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-sm">
+          Drag-and-drop is disabled while searching or using batch selection.
+        </div>
+      )}
+
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* File Explorer Content */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {loadingStates.loading ? (
-            <div className="flex-1 flex items-center justify-center">
-              <Loader2 className="w-8 h-8 animate-spin" />
+            <div className="flex-1 p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
+                {Array.from({ length: 10 }).map((_, idx) => (
+                  <div key={`skeleton-${idx}`} className="rounded-xl border bg-background overflow-hidden animate-pulse">
+                    <div className="aspect-[4/3] bg-muted" />
+                    <div className="p-3 space-y-2">
+                      <div className="h-4 bg-muted rounded w-3/4 mx-auto" />
+                      <div className="h-3 bg-muted/70 rounded w-1/2 mx-auto" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : currentItems.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-              <Folder className="w-16 h-16 text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-semibold mb-2">
+            <div className="flex-1 p-4">
+              <div className="h-full rounded-xl border border-dashed bg-background/70 flex flex-col items-center justify-center text-center p-8">
+                <Folder className="w-16 h-16 text-muted-foreground/50 mb-4" />
+                <h3 className="text-lg font-semibold tracking-tight mb-2">
                 {searchQuery ? 'No items found' : 'This folder is empty'}
-              </h3>
-              <p className="text-muted-foreground mb-4">
+                </h3>
+                <p className="text-muted-foreground mb-4 max-w-md">
                 {searchQuery ? 'Try a different search term' : 'Create a new folder or upload some files'}
-              </p>
-              {!searchQuery && (
-                <Button onClick={() => setShowCreateFolder(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Folder
-                </Button>
-              )}
+                </p>
+                {!searchQuery && (
+                  <Button onClick={() => setShowCreateFolder(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    New Folder
+                  </Button>
+                )}
+              </div>
             </div>
           ) : (
             <ScrollArea className="flex-1">
@@ -1020,13 +1307,20 @@ export default function CollectionsPage() {
                     onDragEnd={handleDragEnd}
                   >
                     <SortableContext items={currentItems.map(item => item.id)} strategy={verticalListSortingStrategy}>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
                         {currentItems.map((item) => (
                           <SortableCollectionItem
                             key={item.id}
                             item={item}
                             selectedItems={selectedItems}
                             setSelectedItems={setSelectedItems}
+                            dragDisabled={
+                              item.type !== 'folder' ||
+                              searchQuery.trim().length > 0 ||
+                              selectedItems.size > 0 ||
+                              loadingStates.renaming ||
+                              loadingStates.deleting
+                            }
                             onEdit={(item) => {
                               setEditingItem(item)
                               setEditFormData({
@@ -1060,7 +1354,7 @@ export default function CollectionsPage() {
                       <ContextMenu key={item.id}>
                         <ContextMenuTrigger>
                           <div
-                            className={`flex items-center gap-3 p-2 rounded cursor-pointer hover:bg-accent ${
+                            className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-colors duration-150 hover:bg-accent ${
                               selectedItems.has(item.id) ? 'bg-accent' : ''
                             }`}
                             onClick={() => {
@@ -1141,18 +1435,53 @@ export default function CollectionsPage() {
 
         {/* Photos Section - Show when viewing a collection */}
         {currentPath.length > 0 && (
-          <div className="border-t bg-background">
+          <div className="mx-4 mb-4 rounded-xl border bg-background shadow-sm">
             <div className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Photos in Collection</h3>
-                <Button onClick={() => setShowPhotoUpload(true)} size="sm">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Photos
-                </Button>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                <h3 className="text-lg font-semibold tracking-tight">Photos in Collection</h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  {collectionPhotos.length > 0 && (
+                    <>
+                      <Button onClick={toggleSelectAllPhotos} size="sm" variant="outline" className="h-9">
+                        {selectedPhotos.size === collectionPhotos.length ? 'Clear All' : 'Select All'}
+                      </Button>
+                      {selectedPhotos.size > 0 && (
+                        <>
+                          <Button
+                            onClick={removeSelectedPhotosFromCollection}
+                            size="sm"
+                            variant="outline"
+                            disabled={loadingStates.deleting}
+                            className="h-9"
+                          >
+                            {loadingStates.deleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                            Remove Selected ({selectedPhotos.size})
+                          </Button>
+                          <Button
+                            onClick={permanentlyDeleteSelectedPhotos}
+                            size="sm"
+                            variant="destructive"
+                            disabled={loadingStates.deleting}
+                            className="h-9"
+                          >
+                            {loadingStates.deleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                            {photoDeleteProgress
+                              ? `Deleting ${photoDeleteProgress.current}/${photoDeleteProgress.total}`
+                              : 'Delete Selected Permanently'}
+                          </Button>
+                        </>
+                      )}
+                    </>
+                  )}
+                  <Button onClick={() => setShowPhotoUpload(true)} size="sm" className="h-9">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Photos
+                  </Button>
+                </div>
               </div>
 
               {collectionPhotos.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
+                <div className="text-center py-8 text-muted-foreground border border-dashed rounded-xl bg-muted/20">
                   <FileImage className="w-12 h-12 mx-auto mb-4 opacity-20" />
                   <p className="text-sm">No photos in this collection yet</p>
                   <Button
@@ -1166,13 +1495,43 @@ export default function CollectionsPage() {
                   </Button>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                  {collectionPhotos.map((photo) => (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {renderedCollectionPhotos.map((photo) => (
                     <ContextMenu key={photo.id}>
                       <ContextMenuTrigger>
-                        <div className="relative group aspect-square rounded-lg overflow-hidden border bg-muted cursor-pointer hover:shadow-lg transition-all">
+                        <div className="relative group aspect-square rounded-lg overflow-hidden border bg-muted cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 ease-out">
+                          <div className="absolute top-2 left-2 z-20">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedPhotos((prev) => {
+                                  const next = new Set(prev)
+                                  if (next.has(photo.id)) {
+                                    next.delete(photo.id)
+                                  } else {
+                                    next.add(photo.id)
+                                  }
+                                  return next
+                                })
+                              }}
+                              className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                                selectedPhotos.has(photo.id)
+                                  ? 'bg-primary border-primary text-primary-foreground'
+                                  : 'border-white/60 bg-black/30 hover:border-white'
+                              }`}
+                              aria-label={selectedPhotos.has(photo.id) ? 'Deselect photo' : 'Select photo'}
+                            >
+                              {selectedPhotos.has(photo.id) && (
+                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </button>
+                          </div>
                           <Image
-                            src={getThumbnailUrl(photo.image_id)}
+                            src={getThumbnailUrl(photo.image_id, 420)}
                             alt={photo.alt || photo.title}
                             fill
                             className="object-cover group-hover:scale-105 transition-transform"
@@ -1248,15 +1607,33 @@ export default function CollectionsPage() {
                         <ContextMenuSeparator />
                         <ContextMenuItem
                           onClick={() => removePhotoFromCollection(photo.id)}
-                          className="text-destructive"
+                          className="text-amber-600 focus:text-amber-600"
                         >
                           <Trash2 className="w-4 h-4 mr-2" />
                           Remove from Collection
                         </ContextMenuItem>
+                        <ContextMenuItem
+                          onClick={() => permanentlyDeletePhoto(photo)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete Permanently
+                        </ContextMenuItem>
                       </ContextMenuContent>
                     </ContextMenu>
                   ))}
-                </div>
+                  </div>
+                  {collectionPhotos.length > renderedCollectionPhotos.length && (
+                    <div className="mt-4 flex justify-center">
+                      <Button
+                        variant="outline"
+                        onClick={() => setPhotoRenderCount((prev) => prev + 120)}
+                      >
+                        Load More ({collectionPhotos.length - renderedCollectionPhotos.length} remaining)
+                      </Button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -1437,15 +1814,15 @@ export default function CollectionsPage() {
 
       {/* Edit Collection Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
+        <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-2xl max-h-[90vh] p-0 flex flex-col">
+          <DialogHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 border-b">
             <DialogTitle>Edit Collection</DialogTitle>
             <DialogDescription>
               Update the collection details below
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-y-auto px-4 pb-4 sm:px-6 sm:pb-6">
             <div className="space-y-2">
               <Label htmlFor="edit-title">Title *</Label>
               <Input
@@ -1468,7 +1845,7 @@ export default function CollectionsPage() {
 
             <div className="space-y-2">
               <Label htmlFor="edit-cover">Cover Image</Label>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Input
                   id="edit-cover"
                   value={editFormData.cover_image_url}
@@ -1479,19 +1856,37 @@ export default function CollectionsPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setShowImageSelector(true)}
+                  onClick={openCoverImageSelector}
+                  className="w-full sm:w-auto"
                 >
                   Browse Images
                 </Button>
+              </div>
+              <div className="mt-3 rounded-lg border p-3">
+                <p className="text-xs text-muted-foreground mb-2">
+                  Or upload a new cover image from your device
+                </p>
+                <CloudinaryUpload
+                  currentImageUrl={editFormData.cover_image_url || undefined}
+                  onUploadComplete={(data) => {
+                    setEditFormData((prev) => ({ ...prev, cover_image_url: data.image_url }))
+                    toast.success('Cover image uploaded')
+                  }}
+                  folder={
+                    editingItem && editingItem.type === 'folder'
+                      ? getCollectionFolder(editingItem.data as Collection)
+                      : 'rithychanvirak/covers'
+                  }
+                />
               </div>
               {editFormData.cover_image_url && (
                 <div className="mt-2">
                   <Image
                     src={editFormData.cover_image_url}
                     alt="Cover preview"
-                    width={100}
-                    height={75}
-                    className="object-cover rounded border"
+                    width={160}
+                    height={120}
+                    className="object-cover rounded border max-w-full h-auto"
                     onError={(e) => {
                       e.currentTarget.style.display = 'none'
                     }}
@@ -1561,42 +1956,85 @@ export default function CollectionsPage() {
 
       {/* Image Selector Dialog */}
       <Dialog open={showImageSelector} onOpenChange={setShowImageSelector}>
-        <DialogContent className="sm:max-w-4xl max-h-[80vh]">
-          <DialogHeader>
+        <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-5xl max-h-[90vh] p-0 flex flex-col">
+          <DialogHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 border-b">
             <DialogTitle>Select Cover Image</DialogTitle>
             <DialogDescription>
-              Choose an existing image to use as the collection cover
+              Choose from photos in this album, or from all photos
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="max-h-[60vh]">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4">
-              {availableImages.map((photo) => (
-                <div
-                  key={photo.id}
-                  className="relative aspect-square cursor-pointer rounded-lg overflow-hidden border-2 hover:border-primary transition-colors"
-                  onClick={() => {
-                    setEditFormData({ ...editFormData, cover_image_url: photo.image_url })
-                    setShowImageSelector(false)
-                  }}
-                >
-                  <Image
-                    src={photo.image_url}
-                    alt={photo.title}
-                    fill
-                    className="object-cover"
-                  />
-                  <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center">
-                    <div className="opacity-0 hover:opacity-100 text-white text-xs font-medium bg-black/50 px-2 py-1 rounded">
-                      Select
+          <ScrollArea className="flex-1 min-h-0 max-h-[72vh]">
+            {coverImagesLoading ? (
+              <div className="flex items-center justify-center py-12 text-muted-foreground">
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Loading images...
+              </div>
+            ) : (
+              <div className="space-y-6 p-4">
+                <div>
+                  <h4 className="text-sm font-semibold mb-3">Photos In This Album</h4>
+                  {coverCollectionImages.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                      {coverCollectionImages.map((photo) => (
+                        <div
+                          key={`collection-${photo.id}`}
+                          className="relative aspect-square cursor-pointer rounded-lg overflow-hidden border-2 hover:border-primary transition-colors"
+                          onClick={() => {
+                            setEditFormData((prev) => ({ ...prev, cover_image_url: photo.image_url }))
+                            setShowImageSelector(false)
+                          }}
+                        >
+                          <Image
+                            src={photo.image_url}
+                            alt={photo.title}
+                            fill
+                            className="object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center">
+                            <div className="opacity-0 hover:opacity-100 text-white text-xs font-medium bg-black/50 px-2 py-1 rounded">
+                              Select
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No photos inside this album yet.</p>
+                  )}
                 </div>
-              ))}
-            </div>
-            {availableImages.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                No images available. Upload some photos first.
+
+                <div>
+                  <h4 className="text-sm font-semibold mb-3">All Photos</h4>
+                  {coverAllImages.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                      {coverAllImages.map((photo) => (
+                        <div
+                          key={`all-${photo.id}`}
+                          className="relative aspect-square cursor-pointer rounded-lg overflow-hidden border-2 hover:border-primary transition-colors"
+                          onClick={() => {
+                            setEditFormData((prev) => ({ ...prev, cover_image_url: photo.image_url }))
+                            setShowImageSelector(false)
+                          }}
+                        >
+                          <Image
+                            src={photo.image_url}
+                            alt={photo.title}
+                            fill
+                            className="object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center">
+                            <div className="opacity-0 hover:opacity-100 text-white text-xs font-medium bg-black/50 px-2 py-1 rounded">
+                              Select
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No photos available.</p>
+                  )}
+                </div>
               </div>
             )}
           </ScrollArea>
@@ -1697,7 +2135,7 @@ export default function CollectionsPage() {
 
       {/* Photo Preview Dialog */}
       <Dialog open={showPhotoPreview} onOpenChange={setShowPhotoPreview}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full sm:max-w-6xl sm:max-h-[90vh] p-4 sm:p-6">
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full sm:max-w-6xl sm:max-h-[90vh] p-4 sm:p-6 overflow-hidden flex flex-col">
           <DialogHeader className="pb-4">
             <DialogTitle className="text-base sm:text-lg lg:text-xl">{selectedPhoto?.title}</DialogTitle>
             <DialogDescription className="text-sm">
@@ -1706,43 +2144,43 @@ export default function CollectionsPage() {
           </DialogHeader>
 
           {selectedPhoto && (
-            <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 max-h-[75vh] lg:max-h-[80vh]">
+            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 sm:gap-6">
               {/* Image */}
-              <div className="flex-1 relative min-h-[300px] lg:min-h-[400px] rounded-lg overflow-hidden bg-muted flex items-center justify-center">
+              <div className="relative h-[48vh] sm:h-[56vh] lg:h-[68vh] rounded-lg overflow-hidden bg-muted">
                 <Image
-                  src={getThumbnailUrl(selectedPhoto.image_id)}
+                  src={getOptimizedImageUrl(selectedPhoto.image_id, 1800)}
                   alt={selectedPhoto.alt || selectedPhoto.title}
-                  width={selectedPhoto.image_width || 1200}
-                  height={selectedPhoto.image_height || 800}
-                  className="max-w-full max-h-full object-contain"
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 65vw"
+                  className="object-contain"
                   priority
                 />
               </div>
 
               {/* Metadata Sidebar */}
-              <div className="w-full lg:w-80 space-y-6 max-h-[400px] lg:max-h-none overflow-y-auto">
+              <div className="w-full min-w-0 space-y-6 overflow-y-auto pr-1 lg:max-h-[68vh]">
                 {/* Basic Info */}
                 <div className="space-y-4">
                   <h3 className="font-semibold">Basic Information</h3>
                   <div className="space-y-3">
-                    <div className="flex justify-between">
+                    <div className="flex justify-between gap-3">
                       <span className="text-sm text-muted-foreground">Title:</span>
-                      <span className="text-sm font-medium">{selectedPhoto.title}</span>
+                      <span className="text-sm font-medium text-right truncate">{selectedPhoto.title}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between gap-3">
                       <span className="text-sm text-muted-foreground">Dimensions:</span>
-                      <span className="text-sm font-medium">{selectedPhoto.image_width} × {selectedPhoto.image_height}</span>
+                      <span className="text-sm font-medium text-right">{selectedPhoto.image_width} x {selectedPhoto.image_height}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between gap-3">
                       <span className="text-sm text-muted-foreground">Date Taken:</span>
-                      <span className="text-sm font-medium">
+                      <span className="text-sm font-medium text-right">
                         {selectedPhoto.date_taken ? new Date(selectedPhoto.date_taken).toLocaleDateString() : 'Unknown'}
                       </span>
                     </div>
                     {selectedPhoto.location && (
-                      <div className="flex justify-between">
+                      <div className="flex justify-between gap-3">
                         <span className="text-sm text-muted-foreground">Location:</span>
-                        <span className="text-sm font-medium">{selectedPhoto.location}</span>
+                        <span className="text-sm font-medium text-right truncate">{selectedPhoto.location}</span>
                       </div>
                     )}
                   </div>
@@ -1753,56 +2191,55 @@ export default function CollectionsPage() {
                   <h3 className="font-semibold">Camera Settings</h3>
                   <div className="space-y-3">
                     {selectedPhoto.camera && (
-                      <div className="flex justify-between">
+                      <div className="flex justify-between gap-3">
                         <span className="text-sm text-muted-foreground">Camera:</span>
-                        <span className="text-sm font-medium">{selectedPhoto.camera}</span>
+                        <span className="text-sm font-medium text-right truncate">{selectedPhoto.camera}</span>
                       </div>
                     )}
                     {selectedPhoto.lens && (
-                      <div className="flex justify-between">
+                      <div className="flex justify-between gap-3">
                         <span className="text-sm text-muted-foreground">Lens:</span>
-                        <span className="text-sm font-medium">{selectedPhoto.lens}</span>
+                        <span className="text-sm font-medium text-right truncate">{selectedPhoto.lens}</span>
                       </div>
                     )}
                     {selectedPhoto.settings && (
                       <>
                         {selectedPhoto.settings.aperture && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between gap-3">
                             <span className="text-sm text-muted-foreground">Aperture:</span>
-                            <span className="text-sm font-medium">{selectedPhoto.settings.aperture}</span>
+                            <span className="text-sm font-medium text-right">{selectedPhoto.settings.aperture}</span>
                           </div>
                         )}
                         {selectedPhoto.settings.shutter && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between gap-3">
                             <span className="text-sm text-muted-foreground">Shutter:</span>
-                            <span className="text-sm font-medium">{selectedPhoto.settings.shutter}</span>
+                            <span className="text-sm font-medium text-right">{selectedPhoto.settings.shutter}</span>
                           </div>
                         )}
                         {selectedPhoto.settings.iso && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between gap-3">
                             <span className="text-sm text-muted-foreground">ISO:</span>
-                            <span className="text-sm font-medium">{selectedPhoto.settings.iso}</span>
+                            <span className="text-sm font-medium text-right">{selectedPhoto.settings.iso}</span>
                           </div>
                         )}
                         {selectedPhoto.settings.focalLength && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between gap-3">
                             <span className="text-sm text-muted-foreground">Focal Length:</span>
-                            <span className="text-sm font-medium">{selectedPhoto.settings.focalLength}</span>
+                            <span className="text-sm font-medium text-right">{selectedPhoto.settings.focalLength}</span>
                           </div>
                         )}
                       </>
                     )}
                   </div>
                 </div>
-              </div>
 
-              {/* Description */}
-              {selectedPhoto.description && (
-                <div className="space-y-2">
-                  <h3 className="font-semibold">Description</h3>
-                  <p className="text-sm text-muted-foreground">{selectedPhoto.description}</p>
-                </div>
-              )}
+                {selectedPhoto.description && (
+                  <div className="space-y-2">
+                    <h3 className="font-semibold">Description</h3>
+                    <p className="text-sm text-muted-foreground break-words">{selectedPhoto.description}</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -1846,7 +2283,7 @@ export default function CollectionsPage() {
                   <div className="space-y-3">
                     <div className="relative aspect-square rounded-lg overflow-hidden bg-muted border">
                       <Image
-                        src={getThumbnailUrl(editingPhoto.image_id)}
+                        src={getOptimizedImageUrl(editingPhoto.image_id, 900)}
                         alt={editingPhoto.alt || editingPhoto.title}
                         fill
                         className="object-cover"

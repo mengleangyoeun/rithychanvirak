@@ -3,7 +3,7 @@
 import { motion } from 'motion/react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { getOptimizedImageUrl } from '@/lib/cloudinary'
+import { getBlurPlaceholderDataUrl, getOptimizedImageUrl } from '@/lib/cloudinary'
 
 interface Photo {
   _id: string
@@ -72,6 +72,8 @@ export function Works({ photos }: { photos: Photo[] }) {
                     sizes="(max-width: 640px) 288px, (max-width: 768px) 320px, 384px"
                     className="object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
                     loading={index < 3 ? "eager" : "lazy"}
+                    placeholder="blur"
+                    blurDataURL={getBlurPlaceholderDataUrl(48, 48)}
                   />
 
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
@@ -121,6 +123,8 @@ export function Works({ photos }: { photos: Photo[] }) {
                     sizes="384px"
                     className="object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
                     loading={index < 3 ? "eager" : "lazy"}
+                    placeholder="blur"
+                    blurDataURL={getBlurPlaceholderDataUrl(48, 48)}
                   />
 
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />

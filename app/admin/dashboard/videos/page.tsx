@@ -18,9 +18,11 @@ import { Switch } from '@/components/ui/switch'
 import Image from 'next/image'
 import { toast } from 'sonner'
 import { ReorderableStoryboard } from '@/components/reorderable-storyboard'
+import { CloudinaryUpload } from '@/components/cloudinary-upload'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, rectSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { revalidatePublicPaths } from '@/lib/revalidate-client'
 
 export default function VideosManagementPage() {
   const supabase = createClient()
@@ -144,6 +146,7 @@ export default function VideosManagementPage() {
         if (!error) {
           await saveStoryboardImages(editingVideo.id)
           toast.success('Video updated successfully')
+          await revalidatePublicPaths(['/', '/videos'])
           await fetchVideos()
           resetForm()
         } else {
@@ -158,6 +161,7 @@ export default function VideosManagementPage() {
         if (!error && data && data[0]) {
           await saveStoryboardImages(data[0].id)
           toast.success('Video created successfully')
+          await revalidatePublicPaths(['/', '/videos'])
           await fetchVideos()
           resetForm()
         } else {
@@ -170,8 +174,6 @@ export default function VideosManagementPage() {
   }
 
   const saveStoryboardImages = async (videoId: string) => {
-    if (storyboardImages.length === 0) return
-
     // Delete existing storyboard images if editing
     if (editingVideo) {
       await supabase
@@ -179,6 +181,9 @@ export default function VideosManagementPage() {
         .delete()
         .eq('video_id', videoId)
     }
+
+    // If all storyboard images were removed, we're done after clearing existing rows.
+    if (storyboardImages.length === 0) return
 
     // Insert new storyboard images
     const storyboardData = storyboardImages.map((img, index) => ({
@@ -238,6 +243,8 @@ export default function VideosManagementPage() {
         image_url: img.image_url,
         name: img.alt || 'Storyboard Image',
       })))
+    } else {
+      setStoryboardImages([])
     }
 
     setShowForm(true)
@@ -252,6 +259,7 @@ export default function VideosManagementPage() {
 
       if (!error) {
         toast.success('Video deleted successfully')
+        await revalidatePublicPaths(['/', '/videos'])
         await fetchVideos()
       } else {
         toast.error('Failed to delete video')
@@ -306,6 +314,31 @@ export default function VideosManagementPage() {
     return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="225"%3E%3Crect width="400" height="225" fill="%23f3f4f6"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="system-ui" font-size="16" fill="%239ca3af"%3ENo Thumbnail%3C/text%3E%3C/svg%3E'
   }
 
+  const getFormThumbnailPreview = () => {
+    if (formData.thumbnail_url) return formData.thumbnail_url
+
+    if (formData.video_type === 'youtube') {
+      const patterns = [
+        /(?:youtube\.com\/watch\?v=)([^&\s]+)/,
+        /(?:youtu\.be\/)([^?\s]+)/,
+        /(?:youtube\.com\/embed\/)([^?\s]+)/,
+        /(?:youtube\.com\/v\/)([^?\s]+)/,
+      ]
+      for (const pattern of patterns) {
+        const match = formData.video_url.match(pattern)
+        if (match && match[1]) {
+          return `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg`
+        }
+      }
+    }
+
+    if (formData.video_type === 'vimeo') {
+      return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="225"%3E%3Crect width="400" height="225" fill="%2300adef"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="system-ui" font-size="16" fill="white"%3EVimeo Video%3C/text%3E%3C/svg%3E'
+    }
+
+    return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="225"%3E%3Crect width="400" height="225" fill="%23f3f4f6"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="system-ui" font-size="16" fill="%239ca3af"%3EThumbnail Preview%3C/text%3E%3C/svg%3E'
+  }
+
   // Update video order in database
   const updateVideoOrder = async (reorderedVideos: VideoType[]) => {
     try {
@@ -321,17 +354,7 @@ export default function VideosManagementPage() {
           .eq('id', update.id)
       }
 
-      // Revalidate homepage to show new order immediately
-      try {
-        await fetch('/api/revalidate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: '/' })
-        })
-      } catch (revalidateError) {
-        console.warn('Failed to revalidate homepage:', revalidateError)
-        // Don't fail the whole operation if revalidation fails
-      }
+      await revalidatePublicPaths(['/', '/videos'])
 
       toast.success('Video order updated')
     } catch (error: unknown) {
@@ -526,6 +549,7 @@ export default function VideosManagementPage() {
                           .eq('id', video.id)
 
                         if (error) throw error
+                        await revalidatePublicPaths(['/', '/videos'])
                         await fetchVideos()
                         toast.success(`Video ${checked ? 'activated' : 'deactivated'}`)
                       } catch (error) {
@@ -554,6 +578,7 @@ export default function VideosManagementPage() {
                           .eq('id', video.id)
 
                         if (error) throw error
+                        await revalidatePublicPaths(['/', '/videos'])
                         await fetchVideos()
                         toast.success(`Video ${checked ? 'marked as featured' : 'removed from featured'}`)
                       } catch (error) {
@@ -817,14 +842,62 @@ export default function VideosManagementPage() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="thumbnail_url">Custom Thumbnail URL</Label>
-              <Input
-                id="thumbnail_url"
-                value={formData.thumbnail_url}
-                onChange={(e) => setFormData({ ...formData, thumbnail_url: e.target.value })}
-                placeholder="https://..."
-              />
+            <div className="space-y-3 rounded-lg border p-4 bg-card">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <Label htmlFor="thumbnail_url">Custom Thumbnail</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Upload from device or paste URL. Leave empty to use auto thumbnail.
+                  </p>
+                </div>
+                {formData.thumbnail_url && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setFormData({ ...formData, thumbnail_url: '' })}
+                  >
+                    Remove Custom
+                  </Button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_240px] gap-4">
+                <div className="space-y-3">
+                  <Input
+                    id="thumbnail_url"
+                    value={formData.thumbnail_url}
+                    onChange={(e) => setFormData({ ...formData, thumbnail_url: e.target.value })}
+                    placeholder="https://... (optional)"
+                  />
+
+                  <div className="rounded-md border p-3 bg-background">
+                    <CloudinaryUpload
+                      currentImageUrl={formData.thumbnail_url || undefined}
+                      onUploadComplete={(data) => {
+                        setFormData((prev) => ({ ...prev, thumbnail_url: data.image_url }))
+                        toast.success('Thumbnail uploaded')
+                      }}
+                      folder="rithychanvirak/videos/thumbnails"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {formData.thumbnail_url ? 'Custom Preview' : 'Auto Preview'}
+                  </p>
+                  <div className="relative aspect-video overflow-hidden rounded-lg border bg-muted">
+                    <Image
+                      src={getFormThumbnailPreview()}
+                      alt="Thumbnail preview"
+                      fill
+                      className="object-cover"
+                      sizes="240px"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-2">

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, use, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { getThumbnailUrl } from '@/lib/cloudinary'
+import { getBlurPlaceholderDataUrl, getThumbnailFromSource, getThumbnailUrl } from '@/lib/cloudinary'
 import Image from 'next/image'
 import Link from 'next/link'
 import { motion } from 'motion/react'
@@ -11,6 +11,7 @@ import { notFound } from 'next/navigation'
 import { FullscreenPhotoPreview } from '@/components/fullscreen-photo-preview'
 import { PhotoGridSkeleton } from '@/components/photo-grid-skeleton'
 import { CollectionCardSkeleton } from '@/components/collection-card-skeleton'
+import { shouldShowEmptyState, shouldShowPhotoGrid } from '@/lib/collection-visibility'
 import type { Photo, Collection } from '@/types/database'
 
 interface CollectionWithChildren extends Collection {
@@ -71,6 +72,24 @@ async function getCollectionPhotos(collectionId: string) {
   return (data?.map(cp => cp.photos).filter(Boolean) as unknown as Photo[]) || []
 }
 
+async function getRootLevelPhotos() {
+  const supabase = createClient()
+  const [allPhotosResult, linksResult] = await Promise.all([
+    supabase
+      .from('photos')
+      .select('*')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('collection_photos')
+      .select('photo_id')
+  ])
+
+  if (allPhotosResult.error || linksResult.error) return []
+
+  const linkedIds = new Set((linksResult.data || []).map((row) => row.photo_id))
+  return (allPhotosResult.data || []).filter((photo) => !linkedIds.has(photo.id))
+}
+
 export default function CollectionPage({ params }: CollectionPageProps) {
   const resolvedParams = use(params)
   const [collection, setCollection] = useState<CollectionWithChildren | null>(null)
@@ -81,10 +100,32 @@ export default function CollectionPage({ params }: CollectionPageProps) {
   const [fullscreenOpen, setFullscreenOpen] = useState(false)
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null)
+  const [photoRenderCount, setPhotoRenderCount] = useState(120)
 
   useEffect(() => {
     async function fetchData() {
       try {
+        if (resolvedParams.slug === 'root') {
+          const rootPhotos = await getRootLevelPhotos()
+          const now = new Date().toISOString()
+          setCollection({
+            id: 'root-uncategorized',
+            title: 'Root Album',
+            slug: 'root',
+            description: 'Photos uploaded without assigning to a collection',
+            parent_id: undefined,
+            order: -1,
+            created_at: now,
+            updated_at: now,
+            collectionType: 'sub',
+            photosCount: rootPhotos.length,
+            childCollections: []
+          })
+          setPhotos(rootPhotos)
+          setLoading(false)
+          return
+        }
+
         const collectionData = await getCollectionBySlug(resolvedParams.slug)
 
         if (!collectionData) {
@@ -171,6 +212,15 @@ export default function CollectionPage({ params }: CollectionPageProps) {
     return sortOrder === 'asc' ? comparison : -comparison
   })
 
+  const visiblePhotos = useMemo(
+    () => sortedPhotos.slice(0, photoRenderCount),
+    [sortedPhotos, photoRenderCount]
+  )
+
+  useEffect(() => {
+    setPhotoRenderCount(120)
+  }, [resolvedParams.slug, sortBy, sortOrder, photos.length])
+
   // Removed early return for loading - show skeleton inline instead
 
   if (!loading && !collection) {
@@ -237,7 +287,7 @@ export default function CollectionPage({ params }: CollectionPageProps) {
 
                 {/* Stats */}
                 <div className="flex items-center gap-6 mt-6">
-                  {collection?.collectionType === 'sub' && photos.length > 0 && (
+                  {photos.length > 0 && (
                     <div className="flex items-center gap-2 text-white/60">
                       <span>📸</span>
                       <span>{photos.length} photo{photos.length !== 1 ? 's' : ''}</span>
@@ -292,11 +342,13 @@ export default function CollectionPage({ params }: CollectionPageProps) {
                       <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 transition-all duration-500 hover:border-white/20 hover:bg-white/10">
                         {subCollection.cover_image_url && (
                           <Image
-                            src={subCollection.cover_image_url}
+                            src={getThumbnailFromSource(subCollection.cover_image_url, 1200)}
                             alt={subCollection.title}
                             fill
                             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                             className="object-cover transition-transform duration-700 group-hover:scale-110"
+                            placeholder="blur"
+                            blurDataURL={getBlurPlaceholderDataUrl(64, 48)}
                           />
                         )}
 
@@ -325,8 +377,8 @@ export default function CollectionPage({ params }: CollectionPageProps) {
             </motion.div>
           )}
 
-          {/* Photos Grid - Only show for sub-collections */}
-          {collection?.collectionType === 'sub' && (
+          {/* Photos Grid */}
+          {shouldShowPhotoGrid(loading, photos.length) && (
             <>
               {loading ? (
                 <motion.div
@@ -372,7 +424,7 @@ export default function CollectionPage({ params }: CollectionPageProps) {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 auto-rows-[180px] sm:auto-rows-[200px] md:auto-rows-[220px] gap-2 sm:gap-3 md:gap-4" style={{ gridAutoFlow: 'dense' }}>
-                    {sortedPhotos.filter(photo => photo.image_url && photo.image_id).map((photo, index) => {
+                    {visiblePhotos.filter(photo => photo.image_url && photo.image_id).map((photo, index) => {
                       // Calculate aspect ratio to determine grid span
                       const width = photo.image_width || 1200
                       const height = photo.image_height || 900
@@ -430,6 +482,8 @@ export default function CollectionPage({ params }: CollectionPageProps) {
                                 className="object-cover transition-transform duration-700 group-hover:scale-105"
                                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                                 loading={index < 15 ? 'eager' : 'lazy'}
+                                placeholder="blur"
+                                blurDataURL={getBlurPlaceholderDataUrl(40, 40)}
                                 onError={(e) => {
                                   console.error('Image failed to load:', photo.image_id)
                                   e.currentTarget.style.display = 'none'
@@ -465,16 +519,29 @@ export default function CollectionPage({ params }: CollectionPageProps) {
                       )
                     })}
                   </div>
+                  {sortedPhotos.length > visiblePhotos.length && (
+                    <div className="mt-6 flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => setPhotoRenderCount((prev) => prev + 120)}
+                        className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm transition-colors"
+                      >
+                        Load More ({sortedPhotos.length - visiblePhotos.length} remaining)
+                      </button>
+                    </div>
+                  )}
                 </motion.div>
               )}
             </>
           )}
 
           {/* Empty State */}
-          {!loading && (
-            (collection?.collectionType === 'main' && !collection?.childCollections?.length) ||
-            (collection?.collectionType === 'sub' && !photos.length)
-          ) && (
+          {shouldShowEmptyState({
+            loading,
+            collectionType: collection?.collectionType,
+            childCollectionsCount: collection?.childCollections?.length || 0,
+            photosCount: photos.length,
+          }) && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -549,3 +616,4 @@ export default function CollectionPage({ params }: CollectionPageProps) {
     </div>
   )
 }
+

@@ -3,8 +3,8 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  Image, Video, FolderOpen, ArrowUpRight, TrendingUp, Clock,
-  HardDrive, Activity, Calendar, Settings, BarChart3,
+  Image, Video, FolderOpen, ArrowUpRight, Clock,
+  Activity, Settings,
   Eye, Zap, Camera, Upload, Edit3, Globe, AlertCircle, RefreshCw,
   type LucideIcon
 } from 'lucide-react'
@@ -32,9 +32,6 @@ interface QuickAction {
   description: string
   icon: LucideIcon
   href: string
-  color: string
-  bgColor: string
-  iconBgColor: string
 }
 
 export default function DashboardPage() {
@@ -43,7 +40,6 @@ export default function DashboardPage() {
     photos: 0,
     videos: 0,
     collections: 0,
-    totalViews: 0,
   })
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([])
   const [recentPhotos, setRecentPhotos] = useState<Photo[]>([])
@@ -87,7 +83,6 @@ export default function DashboardPage() {
         photos: photosCount.count || 0,
         videos: videosCount.count || 0,
         collections: collectionsCount.count || 0,
-        totalViews: 0, // Placeholder for now
       })
 
       // Process activity data
@@ -160,9 +155,6 @@ export default function DashboardPage() {
       icon: Image,
       description: 'Total photos uploaded',
       href: '/admin/dashboard/collections',
-      trend: '+12%',
-      color: 'text-blue-700',
-      bgColor: 'bg-blue-200'
     },
     {
       label: 'Videos',
@@ -170,9 +162,6 @@ export default function DashboardPage() {
       icon: Video,
       description: 'Total videos published',
       href: '/admin/dashboard/videos',
-      trend: '+8%',
-      color: 'text-green-700',
-      bgColor: 'bg-green-200'
     },
     {
       label: 'Albums',
@@ -180,21 +169,15 @@ export default function DashboardPage() {
       icon: FolderOpen,
       description: 'Organized albums',
       href: '/admin/dashboard/collections',
-      trend: '+5%',
-      color: 'text-purple-700',
-      bgColor: 'bg-purple-200'
     },
     {
-      label: 'Total Views',
-      value: stats.totalViews,
+      label: 'Total Items',
+      value: stats.photos + stats.videos + stats.collections,
       icon: Eye,
-      description: 'Portfolio views',
-      href: '/',
-      trend: '+24%',
-      color: 'text-orange-700',
-      bgColor: 'bg-orange-200'
+      description: 'Photos, videos, and albums',
+      href: '/admin/dashboard',
     },
-  ], [stats.photos, stats.videos, stats.collections, stats.totalViews])
+  ], [stats.photos, stats.videos, stats.collections])
 
   // Memoized quick actions to prevent unnecessary re-renders
   const quickActions: QuickAction[] = useMemo(() => [
@@ -203,54 +186,30 @@ export default function DashboardPage() {
       description: 'Add new photos to your gallery',
       icon: Upload,
       href: '/admin/dashboard/collections',
-      color: 'text-blue-800',
-      bgColor: 'bg-blue-200 hover:bg-blue-300',
-      iconBgColor: 'bg-blue-200'
     },
     {
       title: 'Create Album',
       description: 'Organize photos into collections',
       icon: FolderOpen,
       href: '/admin/dashboard/collections',
-      color: 'text-purple-800',
-      bgColor: 'bg-purple-200 hover:bg-purple-300',
-      iconBgColor: 'bg-purple-200'
     },
     {
       title: 'Add Video',
       description: 'Upload and manage video content',
       icon: Video,
       href: '/admin/dashboard/videos',
-      color: 'text-green-800',
-      bgColor: 'bg-green-200 hover:bg-green-300',
-      iconBgColor: 'bg-green-200'
     },
     {
       title: 'Edit Content',
       description: 'Update website text and settings',
       icon: Edit3,
       href: '/admin/dashboard/content',
-      color: 'text-orange-800',
-      bgColor: 'bg-orange-200 hover:bg-orange-300',
-      iconBgColor: 'bg-orange-200'
     },
     {
       title: 'View Website',
       description: 'See your portfolio live',
       icon: Globe,
       href: '/',
-      color: 'text-indigo-800',
-      bgColor: 'bg-indigo-200 hover:bg-indigo-300',
-      iconBgColor: 'bg-indigo-200'
-    },
-    {
-      title: 'Analytics',
-      description: 'Track performance metrics',
-      icon: BarChart3,
-      href: '#',
-      color: 'text-pink-800',
-      bgColor: 'bg-pink-200 hover:bg-pink-300',
-      iconBgColor: 'bg-pink-200'
     },
   ], [])
 
@@ -328,10 +287,6 @@ export default function DashboardPage() {
                       <div className="p-2 rounded-lg bg-muted group-hover:bg-muted/80 transition-colors">
                         <Icon className="h-5 w-5 text-muted-foreground" />
                       </div>
-                      <div className="flex items-center gap-1 text-xs font-medium text-green-600">
-                        <TrendingUp className="h-3 w-3" />
-                        {stat.trend}
-                      </div>
                     </div>
                     <div className="space-y-1">
                       <div className="text-2xl font-bold">{stat.value.toLocaleString()}</div>
@@ -357,24 +312,25 @@ export default function DashboardPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             {quickActions.map((action) => {
               const Icon = action.icon
               return (
                 <Button
                   key={action.title}
                   variant="outline"
-                  className="h-auto p-4 flex-col gap-3 hover:shadow-md transition-all hover:border-primary"
+                  className="h-auto p-4 justify-start hover:shadow-sm transition-all"
                   asChild
                 >
                   <Link href={action.href}>
-                    <div className="p-3 rounded-xl bg-muted">
+                    <div className="p-2 rounded-lg bg-muted">
                       <Icon className="h-6 w-6 text-muted-foreground" />
                     </div>
-                    <div className="text-center space-y-1">
+                    <div className="text-left space-y-1 flex-1">
                       <div className="font-semibold text-sm">{action.title}</div>
                       <div className="text-xs text-muted-foreground">{action.description}</div>
                     </div>
+                    <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
                   </Link>
                 </Button>
               )
@@ -541,221 +497,37 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Activity Overview */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5" />
-              Recent Activity
-            </CardTitle>
-            <CardDescription>
-              Your latest content updates across all sections
-            </CardDescription>
-          </div>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Content Distribution</CardTitle>
+          <CardDescription>
+            Breakdown of your current portfolio items
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          {activityLoading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <Skeleton className="h-12 w-12 rounded-lg" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-3 w-1/2" />
-                  </div>
-                </div>
-              ))}
+        <CardContent className="space-y-3">
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs">
+              <span>Photos</span>
+              <span>{stats.photos}</span>
             </div>
-          ) : recentActivity.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Clock className="h-12 w-12 mx-auto mb-3 opacity-20" />
-              <p className="text-sm">No recent activity yet</p>
-              <p className="text-xs mt-1">Start adding content to see activity here</p>
+            <Progress value={(stats.photos / Math.max(stats.photos + stats.videos + stats.collections, 1)) * 100} className="h-1" />
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs">
+              <span>Videos</span>
+              <span>{stats.videos}</span>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {recentActivity.map((item) => {
-                const icon = item.type === 'photo' ? Image : item.type === 'video' ? Video : FolderOpen
-                const Icon = icon
-                const href =
-                  item.type === 'photo' ? '/admin/dashboard/collections' :
-                  item.type === 'video' ? '/admin/dashboard/videos' :
-                  '/admin/dashboard/collections'
-
-                const timeAgo = getTimeAgo(item.created_at)
-
-                return (
-                  <Link
-                    key={item.id}
-                    href={href}
-                    className="flex items-center gap-4 p-3 rounded-lg hover:bg-muted transition-colors group"
-                  >
-                    {/* Thumbnail or icon */}
-                    <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                      {item.image_url ? (
-                        item.image_id && item.type === 'photo' ? (
-                          <NextImage
-                            src={getThumbnailUrl(item.image_id, 100)}
-                            alt={item.title}
-                            fill
-                            sizes="48px"
-                            className="object-cover"
-                          />
-                        ) : (
-                          <NextImage
-                            src={item.image_url}
-                            alt={item.title}
-                            fill
-                            sizes="48px"
-                            className="object-cover"
-                          />
-                        )
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center bg-primary/10">
-                          <Icon className="h-5 w-5 text-primary" />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="text-xs">
-                          {item.type}
-                        </Badge>
-                        <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
-                          {item.title}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        <span>{timeAgo}</span>
-                      </div>
-                    </div>
-
-                    {/* Arrow */}
-                    <ArrowUpRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </Link>
-                )
-              })}
+            <Progress value={(stats.videos / Math.max(stats.photos + stats.videos + stats.collections, 1)) * 100} className="h-1" />
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs">
+              <span>Albums</span>
+              <span>{stats.collections}</span>
             </div>
-          )}
+            <Progress value={(stats.collections / Math.max(stats.photos + stats.videos + stats.collections, 1)) * 100} className="h-1" />
+          </div>
         </CardContent>
       </Card>
-
-      {/* System Overview */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {/* System Status */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <HardDrive className="h-4 w-4" />
-              System Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-sm">Database</span>
-              </div>
-              <Badge variant="secondary" className="text-xs">Online</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-sm">Storage</span>
-              </div>
-              <Badge variant="secondary" className="text-xs">Active</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-sm">CDN</span>
-              </div>
-              <Badge variant="secondary" className="text-xs">Optimized</Badge>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Content Summary */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <BarChart3 className="h-4 w-4" />
-              Content Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Total Items</span>
-                <span className="font-semibold">{(stats.photos + stats.videos + stats.collections).toLocaleString()}</span>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span>Photos</span>
-                  <span>{stats.photos}</span>
-                </div>
-                <Progress value={(stats.photos / Math.max(stats.photos + stats.videos + stats.collections, 1)) * 100} className="h-1" />
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span>Videos</span>
-                  <span>{stats.videos}</span>
-                </div>
-                <Progress value={(stats.videos / Math.max(stats.photos + stats.videos + stats.collections, 1)) * 100} className="h-1" />
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span>Albums</span>
-                  <span>{stats.collections}</span>
-                </div>
-                <Progress value={(stats.collections / Math.max(stats.photos + stats.videos + stats.collections, 1)) * 100} className="h-1" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Quick Stats */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Calendar className="h-4 w-4" />
-              This Month
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center p-3 rounded-lg bg-muted border">
-                <div className="text-lg font-bold">
-                  {recentActivity.filter(item => item.type === 'photo').length}
-                </div>
-                <div className="text-xs text-muted-foreground">Photos Added</div>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-muted border">
-                <div className="text-lg font-bold">
-                  {recentActivity.filter(item => item.type === 'video').length}
-                </div>
-                <div className="text-xs text-muted-foreground">Videos Added</div>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-muted border">
-                <div className="text-lg font-bold">
-                  {recentActivity.filter(item => item.type === 'collection').length}
-                </div>
-                <div className="text-xs text-muted-foreground">Albums Created</div>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-muted border">
-                <div className="text-lg font-bold">
-                  {stats.totalViews}
-                </div>
-                <div className="text-xs text-muted-foreground">Site Views</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   )
 }

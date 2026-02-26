@@ -9,6 +9,7 @@ import { Search, Folder, ArrowRight } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { CollectionCardSkeleton } from '@/components/collection-card-skeleton'
 import type { Collection } from '@/types/database'
+import { getBlurPlaceholderDataUrl, getThumbnailFromSource } from '@/lib/cloudinary'
 
 interface CollectionWithStats extends Collection {
   totalPhotos: number
@@ -18,21 +19,15 @@ interface CollectionWithStats extends Collection {
 // Helper function to count photos recursively
 async function countPhotosRecursively(
   collectionId: string,
-  supabase: ReturnType<typeof createClient>,
-  collectionMap: Map<string, Collection>
+  collectionMap: Map<string, Collection>,
+  directPhotoCountMap: Map<string, number>
 ): Promise<number> {
-  // Count direct photos
-  const { count: directCount } = await supabase
-    .from('collection_photos')
-    .select('*', { count: 'exact', head: true })
-    .eq('collection_id', collectionId)
-
-  let totalCount = directCount || 0
+  let totalCount = directPhotoCountMap.get(collectionId) || 0
 
   // Count photos in child collections recursively
   for (const [id, collection] of collectionMap) {
     if (collection.parent_id === collectionId) {
-      totalCount += await countPhotosRecursively(id, supabase, collectionMap)
+      totalCount += await countPhotosRecursively(id, collectionMap, directPhotoCountMap)
     }
   }
 
@@ -63,6 +58,19 @@ export default function GalleryPage() {
           collectionMap.set(collection.id, collection)
         })
 
+        // Fetch all collection-photo links once and build direct photo counts in-memory.
+        const { data: collectionPhotoLinks, error: collectionPhotoLinksError } = await supabase
+          .from('collection_photos')
+          .select('collection_id')
+
+        if (collectionPhotoLinksError) throw collectionPhotoLinksError
+
+        const directPhotoCountMap = new Map<string, number>()
+        for (const link of collectionPhotoLinks || []) {
+          const current = directPhotoCountMap.get(link.collection_id) || 0
+          directPhotoCountMap.set(link.collection_id, current + 1)
+        }
+
         // Filter root collections
         const rootCollections = allCollections?.filter(collection => !collection.parent_id) || []
 
@@ -76,7 +84,7 @@ export default function GalleryPage() {
               .eq('parent_id', collection.id)
 
             // Count photos recursively (direct + through subcollections)
-            const totalPhotos = await countPhotosRecursively(collection.id, supabase, collectionMap)
+            const totalPhotos = await countPhotosRecursively(collection.id, collectionMap, directPhotoCountMap)
 
             return {
               ...collection,
@@ -88,6 +96,7 @@ export default function GalleryPage() {
 
         setCollections(collectionsWithStats)
         setFilteredCollections(collectionsWithStats)
+
         setLoading(false)
       } catch (error) {
         console.error('Error fetching collections:', error)
@@ -211,13 +220,15 @@ export default function GalleryPage() {
                       {/* Image */}
                       {collection.cover_image_url && (
                         <Image
-                          src={collection.cover_image_url}
+                          src={getThumbnailFromSource(collection.cover_image_url, 1200)}
                           alt={collection.title}
                           fill
                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                           className="object-cover transition-transform duration-700 group-hover:scale-110"
                           loading={index < 3 ? "eager" : "lazy"}
                           priority={index < 3}
+                          placeholder="blur"
+                          blurDataURL={getBlurPlaceholderDataUrl(64, 48)}
                         />
                       )}
 
@@ -279,6 +290,7 @@ export default function GalleryPage() {
               </p>
             </motion.div>
           )}
+
         </div>
       </div>
     </main>

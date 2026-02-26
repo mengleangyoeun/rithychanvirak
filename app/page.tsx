@@ -90,7 +90,6 @@ export default async function HomePage() {
       if (error) {
         // If table doesn't exist yet, return empty array
         if (error.code === 'PGRST116' || error.message?.includes('relation "services" does not exist')) {
-          console.log('Services table not found - run migration first')
           return []
         }
         console.error('Error fetching services:', {
@@ -218,7 +217,8 @@ export default async function HomePage() {
         .from('photos')
         .select('*')
         .eq('featured', true)
-        .order('order', { ascending: true })
+        // Photos currently do not have a persistent "order" field in admin.
+        .order('created_at', { ascending: false })
         .limit(12)
 
       if (error) {

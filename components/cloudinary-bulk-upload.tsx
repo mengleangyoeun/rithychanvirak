@@ -18,6 +18,14 @@ interface CloudinaryUploadResponse {
   resource_type: string
 }
 
+interface CloudinarySignatureResponse {
+  cloudName: string
+  apiKey: string
+  timestamp: number
+  signature: string
+  folder: string | null
+}
+
 interface UploadedImage {
   image_id: string
   image_url: string
@@ -132,10 +140,7 @@ export function CloudinaryBulkUpload({ onUploadComplete, folder }: CloudinaryBul
 
       const compressedFile = await imageCompression(file, COMPRESSION_OPTIONS)
 
-      const compressedSizeMB = compressedFile.size / 1024 / 1024
-      const savedMB = fileSizeMB - compressedSizeMB
 
-      console.log(`Compressed ${file.name}: ${fileSizeMB.toFixed(2)}MB → ${compressedSizeMB.toFixed(2)}MB (saved ${savedMB.toFixed(2)}MB)`)
 
       setCompressionStatus('')
       return compressedFile
@@ -146,16 +151,37 @@ export function CloudinaryBulkUpload({ onUploadComplete, folder }: CloudinaryBul
     }
   }
 
-  const uploadToCloudinary = async (file: File): Promise<CloudinaryUploadResponse> => {
+  const getCloudinarySignature = async (): Promise<CloudinarySignatureResponse> => {
+    const response = await fetch('/api/cloudinary/sign', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ folder }),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to get Cloudinary upload signature')
+    }
+
+    return response.json()
+  }
+
+  const uploadToCloudinary = async (
+    file: File,
+    signedData: CloudinarySignatureResponse
+  ): Promise<CloudinaryUploadResponse> => {
     const formData = new FormData()
     formData.append('file', file)
-    formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET!)
-    if (folder) {
-      formData.append('folder', folder)
+    formData.append('api_key', signedData.apiKey)
+    formData.append('timestamp', String(signedData.timestamp))
+    formData.append('signature', signedData.signature)
+    if (signedData.folder) {
+      formData.append('folder', signedData.folder)
     }
 
     const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
+      `https://api.cloudinary.com/v1_1/${signedData.cloudName}/image/upload`,
       {
         method: 'POST',
         body: formData,
@@ -254,6 +280,8 @@ export function CloudinaryBulkUpload({ onUploadComplete, folder }: CloudinaryBul
     let totalSavedMB = 0
 
     try {
+      const signedData = await getCloudinarySignature()
+
       for (let i = 0; i < files.length; i++) {
         const originalFile = files[i]
         const originalSizeMB = originalFile.size / 1024 / 1024
@@ -281,7 +309,7 @@ export function CloudinaryBulkUpload({ onUploadComplete, folder }: CloudinaryBul
         })
 
         // Upload to Cloudinary
-        const result = await uploadToCloudinary(file)
+        const result = await uploadToCloudinary(file, signedData)
 
         uploaded.push({
           image_id: result.public_id,

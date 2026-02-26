@@ -64,11 +64,15 @@ A modern, full-stack photography portfolio website with complete CMS admin panel
    ```env
    # Supabase
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_publishable_key
+   # Optional fallback during Supabase key migration
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
    SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
    # Cloudinary
    NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloud_name
+   CLOUDINARY_API_KEY=your_api_key
+   # Optional fallback for legacy client-side usage
    NEXT_PUBLIC_CLOUDINARY_API_KEY=your_api_key
    CLOUDINARY_API_SECRET=your_api_secret
 

@@ -16,6 +16,14 @@ interface CloudinaryUploadResponse {
   resource_type: string
 }
 
+interface CloudinarySignatureResponse {
+  cloudName: string
+  apiKey: string
+  timestamp: number
+  signature: string
+  folder: string | null
+}
+
 interface CloudinaryUploadProps {
   onUploadComplete: (data: {
     image_id: string
@@ -56,8 +64,6 @@ export function CloudinaryUpload({ onUploadComplete, currentImageUrl, currentIma
     try {
       setCompressionStatus(`Compressing (${fileSizeMB.toFixed(1)}MB → ${COMPRESSION_OPTIONS.maxSizeMB}MB)...`)
       const compressedFile = await imageCompression(file, COMPRESSION_OPTIONS)
-      const compressedSizeMB = compressedFile.size / 1024 / 1024
-      console.log(`Compressed: ${fileSizeMB.toFixed(2)}MB → ${compressedSizeMB.toFixed(2)}MB`)
       setCompressionStatus('')
       return compressedFile
     } catch (error) {
@@ -68,15 +74,30 @@ export function CloudinaryUpload({ onUploadComplete, currentImageUrl, currentIma
   }
 
   const uploadToCloudinary = async (file: File) => {
+    const signResponse = await fetch('/api/cloudinary/sign', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ folder }),
+    })
+
+    if (!signResponse.ok) {
+      throw new Error('Failed to get Cloudinary upload signature')
+    }
+
+    const signedData = (await signResponse.json()) as CloudinarySignatureResponse
     const formData = new FormData()
     formData.append('file', file)
-    formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET!)
-    if (folder) {
-      formData.append('folder', folder)
+    formData.append('api_key', signedData.apiKey)
+    formData.append('timestamp', String(signedData.timestamp))
+    formData.append('signature', signedData.signature)
+    if (signedData.folder) {
+      formData.append('folder', signedData.folder)
     }
 
     const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
+      `https://api.cloudinary.com/v1_1/${signedData.cloudName}/image/upload`,
       {
         method: 'POST',
         body: formData,

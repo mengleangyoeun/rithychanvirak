@@ -25,11 +25,15 @@ Required environment variables in `.env` or `.env.local`:
 ```env
 # Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_key
+# Optional fallback during Supabase key migration
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 # Cloudinary Configuration
 NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+# Optional fallback for legacy client-side usage
 NEXT_PUBLIC_CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
 

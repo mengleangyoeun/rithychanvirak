@@ -18,6 +18,7 @@ import { Plus, Pencil, ImageIcon, Search, X, Filter, Eye, ExternalLink, MoreVert
 import { toast } from 'sonner'
 import Image from 'next/image'
 import { getThumbnailUrl } from '@/lib/cloudinary'
+import { revalidatePublicPaths } from '@/lib/revalidate-client'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, rectSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -111,6 +112,7 @@ export default function PhotosManagementPage() {
 
       if (!error) {
         toast.success('Photo updated successfully')
+        await revalidatePublicPaths(['/', '/gallery'])
         await fetchPhotos()
         resetForm()
       } else {
@@ -124,6 +126,7 @@ export default function PhotosManagementPage() {
 
       if (!error && data && data[0]) {
         toast.success('Photo created successfully')
+        await revalidatePublicPaths(['/', '/gallery'])
         await fetchPhotos()
         resetForm()
       } else {
@@ -158,19 +161,33 @@ export default function PhotosManagementPage() {
     setShowForm(true)
   }
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this photo?')) {
+  const handleDelete = async (photo: Photo) => {
+    if (!confirm('Permanently delete this photo from Cloudinary and database?')) return
+
+    try {
+      const cloudinaryResponse = await fetch('/api/cloudinary/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ publicIds: [photo.image_id] }),
+      })
+
+      if (!cloudinaryResponse.ok) {
+        throw new Error('Failed to delete image from Cloudinary')
+      }
+
       const { error } = await supabase
         .from('photos')
         .delete()
-        .eq('id', id)
+        .eq('id', photo.id)
 
-      if (!error) {
-        toast.success('Photo deleted successfully')
-        await fetchPhotos()
-      } else {
-        toast.error('Failed to delete photo')
-      }
+      if (error) throw error
+
+      toast.success('Photo permanently deleted')
+      await revalidatePublicPaths(['/', '/gallery'])
+      await fetchPhotos()
+    } catch (error) {
+      console.error('Permanent photo delete error:', error)
+      toast.error('Failed to permanently delete photo')
     }
   }
 
@@ -259,6 +276,7 @@ export default function PhotosManagementPage() {
     const aspectRatio = photo.image_width && photo.image_height
       ? photo.image_width / photo.image_height
       : 4/5
+    const cardAspectRatio = Math.min(1.4, Math.max(0.72, aspectRatio))
 
     return (
       <div ref={setNodeRef} style={style} className={isDragging ? 'opacity-50' : ''}>
@@ -275,7 +293,7 @@ export default function PhotosManagementPage() {
           </div>
 
           {/* Thumbnail */}
-          <div className="relative bg-muted overflow-hidden" style={{ aspectRatio: aspectRatio.toString() }}>
+          <div className="relative bg-muted overflow-hidden" style={{ aspectRatio: cardAspectRatio.toString() }}>
             {photo.image_id ? (
               <Image
                 src={getThumbnailUrl(photo.image_id, 600)}
@@ -345,7 +363,7 @@ export default function PhotosManagementPage() {
                       View Full Size
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => handleDelete(photo.id)}
+                      onClick={() => handleDelete(photo)}
                       className="text-destructive focus:text-destructive"
                     >
                       <X className="w-4 h-4 mr-2" />
@@ -358,7 +376,7 @@ export default function PhotosManagementPage() {
           </div>
 
           {/* Content */}
-          <CardContent className="p-4 space-y-3">
+          <CardContent className="p-4 space-y-3 overflow-hidden">
             <h3 className="font-semibold text-base line-clamp-1">
               {photo.title}
             </h3>
@@ -367,21 +385,21 @@ export default function PhotosManagementPage() {
             {(photo.camera || photo.location || photo.date_taken) && (
               <div className="space-y-1.5">
                 {photo.camera && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
                     <Camera className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span className="truncate">{photo.camera}</span>
+                    <span className="truncate min-w-0">{photo.camera}</span>
                   </div>
                 )}
                 {photo.location && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
                     <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span className="truncate">{photo.location}</span>
+                    <span className="truncate min-w-0">{photo.location}</span>
                   </div>
                 )}
                 {photo.date_taken && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
                     <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span>{new Date(photo.date_taken).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                    <span className="truncate min-w-0">{new Date(photo.date_taken).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
                   </div>
                 )}
               </div>
@@ -414,6 +432,7 @@ export default function PhotosManagementPage() {
                           .eq('id', photo.id)
 
                         if (error) throw error
+                        await revalidatePublicPaths(['/', '/gallery'])
                         await fetchPhotos()
                         toast.success(`Photo ${checked ? 'marked as featured' : 'removed from featured'}`)
                       } catch (error) {

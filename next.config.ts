@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import path from 'path';
 
 const nextConfig: NextConfig = {
   // Commented out for development - enable for Docker deployment

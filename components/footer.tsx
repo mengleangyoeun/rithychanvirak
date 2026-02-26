@@ -1,168 +1,201 @@
 'use client'
 
-import Link from "next/link"
-import { motion } from "motion/react"
-import { Mail, Phone, Camera, Heart } from "lucide-react"
-import { siInstagram, siTelegram, siFacebook, siGmail, siLintcode } from 'simple-icons'
+import Link from 'next/link'
+import { motion } from 'motion/react'
+import { Mail, Phone, Camera, Heart, Globe, MapPin } from 'lucide-react'
+import { siInstagram, siTelegram, siFacebook, siGmail } from 'simple-icons'
 import type { SimpleIcon } from 'simple-icons'
 import type { LucideIcon } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
-interface ContactData {
-  socialLinks?: Array<{
-    platform: string
-    url: string
-    icon: string
-  }>
+interface SocialLink {
+  platform: string
+  url: string
+  icon: string
 }
 
-// Icon mapping
-const iconMap: { [key: string]: SimpleIcon | LucideIcon } = {
-  Contact: Phone,
-  Phone: Phone,
-  Telegram: siTelegram,
-  MessageCircle: siTelegram,
-  Facebook: siFacebook,
-  Instagram: siInstagram,
-  Gmail: siGmail,
-  Mail: Mail
+interface FooterData {
+  socialLinks: SocialLink[]
+  brandTitle: string
+  brandDescription: string
+  copyrightText: string
+  madeByName?: string
+  madeByUrl?: string
 }
 
-// Color mapping
-const colorMap: { [key: string]: string } = {
-  Contact: "hover:text-green-400",
-  Phone: "hover:text-green-400",
-  Telegram: "hover:text-blue-400",
-  Facebook: "hover:text-blue-500",
-  Instagram: "hover:text-pink-400",
-  Gmail: "hover:text-red-400",
-  Mail: "hover:text-red-400"
+const iconMap: Record<string, SimpleIcon | LucideIcon> = {
+  contact: Phone,
+  phone: Phone,
+  telegram: siTelegram,
+  messagecircle: siTelegram,
+  facebook: siFacebook,
+  instagram: siInstagram,
+  gmail: siGmail,
+  mail: Mail,
+  email: Mail,
+  website: Globe,
+  location: MapPin,
 }
 
-async function getContactData() {
-  // Static contact data since we removed Sanity
-  return {
-    socialLinks: [
-      {
-        platform: 'Contact',
-        url: '+855-12-345-678',
-        icon: 'Phone'
-      },
-      {
-        platform: 'Gmail',
-        url: 'mailto:hello@rithychanvirak.com',
-        icon: 'Gmail'
-      },
-      {
-        platform: 'Instagram',
-        url: 'https://instagram.com/rithychanvirak',
-        icon: 'Instagram'
-      },
-      {
-        platform: 'Facebook',
-        url: 'https://facebook.com/rithychanvirak',
-        icon: 'Facebook'
-      },
-      {
-        platform: 'Telegram',
-        url: 'https://t.me/rithychanvirak',
-        icon: 'Telegram'
+const colorMap: Record<string, string> = {
+  contact: 'hover:text-green-400',
+  phone: 'hover:text-green-400',
+  telegram: 'hover:text-blue-400',
+  facebook: 'hover:text-blue-500',
+  instagram: 'hover:text-pink-400',
+  gmail: 'hover:text-red-400',
+  mail: 'hover:text-red-400',
+  email: 'hover:text-red-400',
+  website: 'hover:text-cyan-400',
+  location: 'hover:text-amber-400',
+}
+
+const normalizeContactUrl = (type: string, value: string): string => {
+  if (!value) return '#'
+  if (value.startsWith('http') || value.startsWith('tel:') || value.startsWith('mailto:')) return value
+  if (type === 'email') return `mailto:${value}`
+  if (type === 'phone' || type === 'contact') return `tel:${value}`
+  return `https://${value}`
+}
+
+async function getFooterData(): Promise<FooterData> {
+  try {
+    const supabase = createClient()
+
+    const [contactResult, settingsResult] = await Promise.all([
+      supabase
+        .from('contact_info')
+        .select('*')
+        .eq('is_active', true)
+        .order('order', { ascending: true }),
+      supabase
+        .from('site_settings')
+        .select('*')
+    ])
+
+    const settingsMap = new Map<string, string>()
+    for (const setting of settingsResult.data || []) {
+      if (typeof setting.value === 'string') {
+        settingsMap.set(setting.key, setting.value)
       }
-    ]
+    }
+
+    const brandTitle = settingsMap.get('footer_brand_title') || 'RITHY CHANVIRAK'
+    const brandDescription =
+      settingsMap.get('footer_brand_description') ||
+      'Capturing moments that tell compelling stories through creativity and passion.'
+    const copyrightText =
+      settingsMap.get('footer_copyright') ||
+      `© ${new Date().getFullYear()} ${brandTitle}. All rights reserved.`
+
+    const madeByName = settingsMap.get('footer_made_by_name') || undefined
+    const madeByUrl = settingsMap.get('footer_made_by_url') || undefined
+
+    const socialLinks: SocialLink[] = (contactResult.data || []).map((contact) => {
+      const type = (contact.type || '').toLowerCase()
+      const icon = (contact.icon || contact.type || 'phone') as string
+      return {
+        platform: type || 'contact',
+        url: normalizeContactUrl(type, contact.value),
+        icon,
+      }
+    })
+
+    return {
+      socialLinks,
+      brandTitle,
+      brandDescription,
+      copyrightText,
+      madeByName,
+      madeByUrl,
+    }
+  } catch (error) {
+    console.error('Footer data fetch error:', error)
+    return {
+      socialLinks: [],
+      brandTitle: 'RITHY CHANVIRAK',
+      brandDescription:
+        'Capturing moments that tell compelling stories through creativity and passion.',
+      copyrightText: `© ${new Date().getFullYear()} RITHY CHANVIRAK. All rights reserved.`,
+    }
   }
 }
 
 export function Footer() {
-  const currentYear = new Date().getFullYear()
-  const [contactData, setContactData] = useState<ContactData | null>(null)
+  const [footerData, setFooterData] = useState<FooterData | null>(null)
+  const quickLinks = useMemo(
+    () => [
+      { href: '/', label: 'Home' },
+      { href: '/gallery', label: 'Gallery' },
+      { href: '/about', label: 'About' },
+      { href: '/contact', label: 'Contact' },
+    ],
+    []
+  )
 
   useEffect(() => {
-    getContactData().then(data => setContactData(data))
+    getFooterData().then(setFooterData)
   }, [])
 
-  // Extract email and phone from contact data
-  const emailLink = contactData?.socialLinks?.find(link =>
-    link.platform === 'gmail' || link.icon === 'Gmail'
-  )
-  const phoneLink = contactData?.socialLinks?.find(link =>
-    link.platform === 'contact' || link.icon === 'Contact' || link.icon === 'Phone'
-  )
-
-  // Add tel: prefix to phone link if needed
-  const phoneUrl = phoneLink?.url ? (
-    phoneLink.url.startsWith('http') || phoneLink.url.startsWith('tel:') || phoneLink.url.startsWith('mailto:')
-      ? phoneLink.url
-      : `tel:${phoneLink.url}`
-  ) : undefined
-
-  const quickLinks = [
-    { href: "/", label: "Home" },
-    { href: "/gallery", label: "Gallery" },
-    { href: "/about", label: "About" },
-    { href: "/contact", label: "Contact" },
-  ]
+  const emailLink = footerData?.socialLinks.find((l) => l.platform === 'email' || l.icon === 'mail' || l.icon === 'gmail')
+  const phoneLink = footerData?.socialLinks.find((l) => l.platform === 'phone' || l.platform === 'contact' || l.icon === 'phone')
 
   return (
-    <footer className="bg-gradient-to-b from-black to-gray-950 text-white border-t border-gray-800">
+    <footer className="bg-gradient-to-b from-black to-zinc-950 text-white border-t border-zinc-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-        {/* Main Footer Content */}
-        <div className="py-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
-          
-          {/* Brand Section */}
-          <motion.div 
+        <div className="py-14 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
+          <motion.div
             className="lg:col-span-2"
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.5 }}
             viewport={{ once: true }}
           >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                <Camera className="w-6 h-6 text-white" />
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-11 h-11 bg-gradient-to-br from-sky-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                <Camera className="w-5 h-5 text-white" />
               </div>
-              <h3 className="text-2xl font-black tracking-wide" style={{ fontFamily: 'var(--font-livvic), sans-serif' }}>
-                RITHY CHANVIRAK
+              <h3 className="text-xl sm:text-2xl font-black tracking-wide" style={{ fontFamily: 'var(--font-livvic), sans-serif' }}>
+                {footerData?.brandTitle || 'RITHY CHANVIRAK'}
               </h3>
             </div>
-            <p className="text-gray-300 leading-relaxed text-lg mb-8 max-w-md">
-              Capturing moments that tell compelling stories through the lens of creativity and passion. 
-              Professional photography services for all your special occasions.
+            <p className="text-zinc-300 leading-relaxed mb-6 max-w-xl">
+              {footerData?.brandDescription || 'Capturing moments that tell compelling stories through creativity and passion.'}
             </p>
-            
-            {/* Social Links */}
-            <div className="flex items-center gap-4">
-              {contactData?.socialLinks?.map((link) => {
-                const IconComponent = iconMap[link.icon] || Phone
-                const colorClass = colorMap[link.icon] || "hover:text-gray-300"
 
-                // Add tel: prefix for phone numbers
-                let url = link.url
-                const isPhone = link.platform?.toLowerCase() === 'contact' ||
-                               link.icon?.toLowerCase().includes('contact') ||
-                               link.icon?.toLowerCase().includes('phone')
-                if (isPhone && !url.startsWith('http') && !url.startsWith('tel:') && !url.startsWith('mailto:')) {
-                  url = `tel:${url}`
-                }
-
+            <div className="flex items-center gap-3 flex-wrap">
+              {footerData?.socialLinks.map((link, idx) => {
+                const key = (link.icon || '').toLowerCase()
+                const IconComponent = iconMap[key]
+                const hasMappedIcon = Boolean(IconComponent)
+                const customIconText = !hasMappedIcon ? link.icon?.trim() : ''
+                const colorClass = colorMap[key] || 'hover:text-zinc-200'
+                const isExternal = link.url.startsWith('http')
                 return (
                   <motion.a
-                    key={link.platform}
-                    href={url}
-                    target={url.startsWith('http') ? '_blank' : '_self'}
-                    rel={url.startsWith('http') ? 'noopener noreferrer' : undefined}
-                    whileHover={{ scale: 1.1, y: -2 }}
-                    whileTap={{ scale: 0.95 }}
-                    className={`w-12 h-12 bg-gray-800 border border-gray-700 rounded-xl flex items-center justify-center text-gray-400 hover:border-gray-600 transition-all duration-300 ${colorClass}`}
+                    key={`${link.platform}-${idx}`}
+                    href={link.url}
+                    target={isExternal ? '_blank' : '_self'}
+                    rel={isExternal ? 'noopener noreferrer' : undefined}
+                    whileHover={{ scale: 1.06, y: -1 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`w-11 h-11 bg-zinc-900 border border-zinc-700 rounded-xl flex items-center justify-center text-zinc-400 transition-all duration-200 ${colorClass}`}
                     aria-label={link.platform}
                   >
-                    {/* Handle both simple-icons and lucide-react icons */}
-                    {'path' in IconComponent ? (
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                    {hasMappedIcon && IconComponent && 'path' in IconComponent ? (
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                         <path d={IconComponent.path} />
                       </svg>
+                    ) : hasMappedIcon && IconComponent ? (
+                      (() => {
+                        const LucideIconComponent = IconComponent as LucideIcon
+                        return <LucideIconComponent className="w-4 h-4" />
+                      })()
+                    ) : customIconText ? (
+                      <span className="text-base leading-none">{customIconText}</span>
                     ) : (
-                      <IconComponent className="w-5 h-5" />
+                      <Phone className="w-4 h-4" />
                     )}
                   </motion.a>
                 )
@@ -170,21 +203,17 @@ export function Footer() {
             </div>
           </motion.div>
 
-          {/* Quick Links */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
+            transition={{ duration: 0.5, delay: 0.05 }}
             viewport={{ once: true }}
           >
-            <h4 className="text-lg font-bold mb-6 text-white">Quick Links</h4>
-            <ul className="space-y-4">
+            <h4 className="text-base font-semibold mb-5">Quick Links</h4>
+            <ul className="space-y-3">
               {quickLinks.map((link) => (
                 <li key={link.href}>
-                  <Link 
-                    href={link.href}
-                    className="text-gray-400 hover:text-white transition-colors duration-300 hover:translate-x-1 inline-block transform"
-                  >
+                  <Link href={link.href} className="text-zinc-400 hover:text-white transition-colors duration-200">
                     {link.label}
                   </Link>
                 </li>
@@ -192,74 +221,53 @@ export function Footer() {
             </ul>
           </motion.div>
 
-          {/* Contact Info */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
             viewport={{ once: true }}
           >
-            <h4 className="text-lg font-bold mb-6 text-white">Get In Touch</h4>
-            <div className="space-y-4">
+            <h4 className="text-base font-semibold mb-5">Get In Touch</h4>
+            <div className="space-y-3">
               {emailLink && (
-                <a
-                  href={emailLink.url}
-                  className="flex items-center gap-3 text-gray-400 hover:text-white transition-colors"
-                >
-                  <Mail className="w-5 h-5 text-blue-400" />
+                <a href={emailLink.url} className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors">
+                  <Mail className="w-4 h-4 text-sky-400" />
                   <span className="text-sm">{emailLink.url.replace('mailto:', '')}</span>
                 </a>
               )}
-              {phoneUrl && (
-                <a
-                  href={phoneUrl}
-                  className="flex items-center gap-3 text-gray-400 hover:text-white transition-colors"
-                >
-                  <Phone className="w-5 h-5 text-green-400" />
-                  <span className="text-sm">{phoneUrl.replace('tel:', '').replace('tel:+', '+')}</span>
+              {phoneLink && (
+                <a href={phoneLink.url} className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors">
+                  <Phone className="w-4 h-4 text-emerald-400" />
+                  <span className="text-sm">{phoneLink.url.replace('tel:', '')}</span>
                 </a>
               )}
+              {!emailLink && !phoneLink && (
+                <p className="text-sm text-zinc-500">Add contact info in Admin → Content.</p>
+              )}
             </div>
-            
-            {/* <div className="mt-8 p-4 bg-gray-900/50 rounded-xl border border-gray-800">
-              <p className="text-sm text-gray-400 mb-2">Available for bookings</p>
-              <p className="text-white font-semibold">Mon - Sat, 9AM - 6PM</p>
-            </div> */}
           </motion.div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="border-t border-gray-800 py-8">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <motion.p 
-              className="text-gray-400 text-sm"
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              viewport={{ once: true }}
-            >
-              &copy; {currentYear} Rithy Chanvirak Photography. All rights reserved.
-            </motion.p>
-            
-            <motion.div 
-              className="flex items-center gap-2 text-gray-400 text-sm"
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              viewport={{ once: true }}
-            >
+        <div className="border-t border-zinc-800 py-6">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
+            <p className="text-zinc-400 text-sm text-center sm:text-left">
+              {footerData?.copyrightText || `© ${new Date().getFullYear()} RITHY CHANVIRAK. All rights reserved.`}
+            </p>
+            <div className="flex items-center gap-2 text-zinc-400 text-sm">
               <span>made with</span>
-              <motion.div
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-              >
-                <Heart className="w-4 h-4 text-red-400 fill-current" />
-              </motion.div>
-              <a href="https://www.instagram.com/yourfavoriteeunc" target="_blank" className="hover:text-blue-400 transition-colors">mengleangyoeun</a>
-              <svg className="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
-                <path d={siLintcode.path} />
-              </svg>
-            </motion.div>
+              <Heart className="w-4 h-4 text-rose-400 fill-current" />
+              {footerData?.madeByName ? (
+                footerData.madeByUrl ? (
+                  <a href={footerData.madeByUrl} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
+                    {footerData.madeByName}
+                  </a>
+                ) : (
+                  <span>{footerData.madeByName}</span>
+                )
+              ) : (
+                <span>studio team</span>
+              )}
+            </div>
           </div>
         </div>
       </div>
