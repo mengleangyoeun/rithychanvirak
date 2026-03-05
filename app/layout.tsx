@@ -7,6 +7,7 @@ import "@fontsource/kantumruy-pro/600.css";
 import "@fontsource/kantumruy-pro/700.css";
 import "./globals.css";
 import { LayoutWrapper } from "@/components/layout-wrapper";
+import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -74,6 +75,7 @@ export default function RootLayout({
         className={`${inter.variable} ${geistSans.variable} ${geistMono.variable} ${livvic.variable} antialiased min-h-screen flex flex-col`}
       >
         <LayoutWrapper>{children}</LayoutWrapper>
+        <Analytics />
       </body>
     </html>
   );
