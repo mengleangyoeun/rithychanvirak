@@ -2,6 +2,10 @@
 
 A modern, full-stack photography portfolio website with complete CMS admin panel.
 
+## Live Demo
+
+- Website: https://www.rithychanvirak.com/
+
 ![Next.js](https://img.shields.io/badge/Next.js-15.5.2-black)
 ![React](https://img.shields.io/badge/React-19.1.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9.2-blue)
