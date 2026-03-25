@@ -148,8 +148,8 @@ export default function CollectionPage({ params }: CollectionPageProps) {
     fetchData()
   }, [resolvedParams.slug])
 
-  // Sort photos based on sortBy and sortOrder
-  const sortedPhotos = [...photos].sort((a, b) => {
+  // Sort photos — memoized so it only re-runs when photos/sort settings change
+  const sortedPhotos = useMemo(() => [...photos].sort((a, b) => {
     let comparison = 0
 
     switch (sortBy) {
@@ -210,7 +210,7 @@ export default function CollectionPage({ params }: CollectionPageProps) {
     }
 
     return sortOrder === 'asc' ? comparison : -comparison
-  })
+  }), [photos, sortBy, sortOrder])
 
   const visiblePhotos = useMemo(
     () => sortedPhotos.slice(0, photoRenderCount),
@@ -353,21 +353,16 @@ export default function CollectionPage({ params }: CollectionPageProps) {
                         )}
 
                         {/* Gradient Overlay - always visible, stronger on hover */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent md:from-black/40 md:via-black/10 md:group-hover:from-black/80 md:group-hover:via-black/30 transition-all duration-500"></div>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent transition-all duration-500"></div>
 
                         {/* Content - always visible on mobile, shown on hover on desktop */}
-                        <div className="absolute inset-0 p-6 flex flex-col justify-end md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
+                        <div className="absolute inset-0 p-6 flex flex-col justify-end">
                           <h3
-                            className="text-xl font-bold text-white mb-2 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300"
+                            className="text-xl font-bold text-white mb-2"
                             style={{ fontFamily: /[\u1780-\u17FF]/.test(subCollection.title) ? '"Kantumruy Pro", sans-serif' : undefined }}
                           >
                             {subCollection.title}
                           </h3>
-                          {subCollection.description && (
-                            <p className="text-sm text-white/70 line-clamp-2 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300 md:delay-75">
-                              {subCollection.description}
-                            </p>
-                          )}
                         </div>
                       </div>
                     </Link>
@@ -485,7 +480,6 @@ export default function CollectionPage({ params }: CollectionPageProps) {
                                 placeholder="blur"
                                 blurDataURL={getBlurPlaceholderDataUrl(40, 40)}
                                 onError={(e) => {
-                                  console.error('Image failed to load:', photo.image_id)
                                   e.currentTarget.style.display = 'none'
                                 }}
                               />

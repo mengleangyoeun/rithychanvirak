@@ -16,22 +16,25 @@ interface CollectionWithStats extends Collection {
   subAlbums: number
 }
 
-// Helper function to count photos recursively
-async function countPhotosRecursively(
-  collectionId: string,
-  collectionMap: Map<string, Collection>,
+// Helper: count total photos and ALL nested sub-albums using BFS
+function countAll(
+  rootId: string,
+  childrenMap: Map<string, string[]>,
   directPhotoCountMap: Map<string, number>
-): Promise<number> {
-  let totalCount = directPhotoCountMap.get(collectionId) || 0
-
-  // Count photos in child collections recursively
-  for (const [id, collection] of collectionMap) {
-    if (collection.parent_id === collectionId) {
-      totalCount += await countPhotosRecursively(id, collectionMap, directPhotoCountMap)
+): { photos: number; subAlbums: number } {
+  let photos = directPhotoCountMap.get(rootId) || 0
+  let subAlbums = 0
+  const queue = [rootId]
+  while (queue.length > 0) {
+    const current = queue.shift()!
+    const children = childrenMap.get(current) || []
+    for (const childId of children) {
+      photos += directPhotoCountMap.get(childId) || 0
+      subAlbums += 1
+      queue.push(childId)
     }
   }
-
-  return totalCount
+  return { photos, subAlbums }
 }
 
 export default function GalleryPage() {
@@ -52,52 +55,41 @@ export default function GalleryPage() {
 
         if (allCollectionsError) throw allCollectionsError
 
-        // Build collection map for efficient lookups
-        const collectionMap = new Map<string, Collection>()
-        allCollections?.forEach(collection => {
-          collectionMap.set(collection.id, collection)
-        })
-
-        // Fetch all collection-photo links once and build direct photo counts in-memory.
+        // Fetch all collection-photo links in one query
         const { data: collectionPhotoLinks, error: collectionPhotoLinksError } = await supabase
           .from('collection_photos')
           .select('collection_id')
 
         if (collectionPhotoLinksError) throw collectionPhotoLinksError
 
+        // Build direct photo count map
         const directPhotoCountMap = new Map<string, number>()
         for (const link of collectionPhotoLinks || []) {
-          const current = directPhotoCountMap.get(link.collection_id) || 0
-          directPhotoCountMap.set(link.collection_id, current + 1)
+          directPhotoCountMap.set(link.collection_id, (directPhotoCountMap.get(link.collection_id) || 0) + 1)
         }
 
-        // Filter root collections
-        const rootCollections = allCollections?.filter(collection => !collection.parent_id) || []
+        // Build parent → children map for fast in-memory traversal
+        const childrenMap = new Map<string, string[]>()
+        for (const col of allCollections || []) {
+          if (col.parent_id) {
+            const siblings = childrenMap.get(col.parent_id) || []
+            siblings.push(col.id)
+            childrenMap.set(col.parent_id, siblings)
+          }
+        }
 
-        // Get stats for each root collection
-        const collectionsWithStats: CollectionWithStats[] = await Promise.all(
-          rootCollections.map(async (collection) => {
-            // Count subcollections
-            const { count: subAlbumsCount } = await supabase
-              .from('collections')
-              .select('*', { count: 'exact', head: true })
-              .eq('parent_id', collection.id)
+        // Filter root collections and compute stats in-memory
+        const rootCollections = (allCollections || []).filter(col => !col.parent_id)
 
-            // Count photos recursively (direct + through subcollections)
-            const totalPhotos = await countPhotosRecursively(collection.id, collectionMap, directPhotoCountMap)
-
-            return {
-              ...collection,
-              totalPhotos,
-              subAlbums: subAlbumsCount || 0
-            }
-          })
-        )
+        const collectionsWithStats: CollectionWithStats[] = rootCollections.map(collection => {
+          const { photos, subAlbums } = countAll(collection.id, childrenMap, directPhotoCountMap)
+          return { ...collection, totalPhotos: photos, subAlbums }
+        })
 
         setCollections(collectionsWithStats)
         setFilteredCollections(collectionsWithStats)
-
         setLoading(false)
+
       } catch (error) {
         console.error('Error fetching collections:', error)
         setLoading(false)
@@ -233,25 +225,21 @@ export default function GalleryPage() {
                       )}
 
                       {/* Gradient Overlay - always visible, stronger on hover */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent md:from-black/40 md:via-black/10 md:group-hover:from-black/80 md:group-hover:via-black/30 transition-all duration-500"></div>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent transition-all duration-500"></div>
 
                       {/* Content - always visible on mobile, shown on hover on desktop */}
-                      <div className="absolute inset-0 p-6 flex flex-col justify-end md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="absolute inset-0 p-6 flex flex-col justify-end">
                         <h3
-                          className="text-2xl font-bold text-white mb-2 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300"
+                          className="text-2xl font-bold text-white mb-2"
                           style={{ fontFamily: /[\u1780-\u17FF]/.test(collection.title) ? '"Kantumruy Pro", sans-serif' : undefined }}
                         >
                           {collection.title}
                         </h3>
 
-                        {collection.description && (
-                          <p className="text-sm text-white/80 mb-4 line-clamp-2 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300 md:delay-75">
-                            {collection.description}
-                          </p>
-                        )}
+
 
                         {/* Stats */}
-                        <div className="flex items-center gap-4 text-xs text-white/70 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300 md:delay-100">
+                        <div className="flex items-center gap-4 text-xs text-white/70">
                           <div className="flex items-center gap-1">
                             <span>📸</span>
                             <span>{collection.totalPhotos}</span>

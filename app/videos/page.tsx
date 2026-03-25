@@ -172,11 +172,6 @@ function VideoCard({ video, index, viewMode }: { video: Video; index: number; vi
                 <h3 className="text-base sm:text-lg md:text-xl font-bold text-white mb-1 sm:mb-2 line-clamp-2">
                   {video.title}
                 </h3>
-                {video.description && (
-                  <p className="text-xs sm:text-sm text-white/70 line-clamp-2 mb-2 sm:mb-3 hidden sm:block">
-                    {video.description}
-                  </p>
-                )}
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs text-white/60">
                   {video.category && (
                     <span className="px-2 py-0.5 sm:px-3 sm:py-1 bg-white/10 rounded-full">

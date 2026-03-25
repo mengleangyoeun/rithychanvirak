@@ -69,22 +69,30 @@ async function getAboutData(): Promise<AboutData | null> {
       supabase.from('about_equipment_categories').select('*').eq('about_content_id', aboutContent.id).order('order')
     ])
 
-    // Fetch equipment items for each category
+    // Fetch equipment items for ALL categories in one query
     const equipmentCategories = equipmentCategoriesRes.data || []
-    const equipmentWithItems = await Promise.all(
-      equipmentCategories.map(async (category) => {
-        const { data: items } = await supabase
+    const categoryIds = equipmentCategories.map(c => c.id)
+
+    const { data: allEquipmentItems } = categoryIds.length > 0
+      ? await supabase
           .from('about_equipment_items')
           .select('*')
-          .eq('equipment_category_id', category.id)
+          .in('equipment_category_id', categoryIds)
           .order('order')
+      : { data: [] }
 
-        return {
-          category: category.category,
-          items: items?.map(item => item.item) || []
-        }
-      })
-    )
+    // Group items by category in-memory
+    const itemsByCategory = new Map<string, string[]>()
+    for (const item of allEquipmentItems || []) {
+      const list = itemsByCategory.get(item.equipment_category_id) || []
+      list.push(item.item)
+      itemsByCategory.set(item.equipment_category_id, list)
+    }
+
+    const equipmentWithItems = equipmentCategories.map(category => ({
+      category: category.category,
+      items: itemsByCategory.get(category.id) || []
+    }))
 
     return {
       title: aboutContent.title,

@@ -14,7 +14,6 @@ interface VideoWithStoryboard extends Video {
 }
 
 export default function VideoPage({ params }: { params: Promise<{ slug: string }> }) {
-  const supabase = createClient()
   const [video, setVideo] = useState<VideoWithStoryboard | null>(null)
   const [relatedVideos, setRelatedVideos] = useState<Video[]>([])
   const [loading, setLoading] = useState(true)
@@ -27,6 +26,7 @@ export default function VideoPage({ params }: { params: Promise<{ slug: string }
   }, [params])
 
   const fetchVideo = useCallback(async () => {
+    const supabase = createClient()
     try {
       setLoading(true)
 
@@ -71,7 +71,7 @@ export default function VideoPage({ params }: { params: Promise<{ slug: string }
     } finally {
       setLoading(false)
     }
-  }, [slug, supabase])
+  }, [slug])
 
   useEffect(() => {
     if (!slug) return

@@ -1,6 +1,6 @@
 'use client'
 
-import { Phone, Mail } from 'lucide-react'
+import { Phone, Mail, Send, CheckCircle } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState, useEffect } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -110,6 +110,35 @@ const platformColors: { [key: string]: string } = {
 export default function ContactPage() {
   const [contactData, setContactData] = useState<ContactData | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Contact form state
+  const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' })
+  const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'sent'>('idle')
+  const [formError, setFormError] = useState('')
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.name || !formData.email || !formData.message) {
+      setFormError('Please fill in all required fields.')
+      return
+    }
+    setFormError('')
+    setFormStatus('sending')
+
+    // Find primary email from contact links
+    const emailLink = contactData?.socialLinks.find(
+      l => l.platform === 'email' || l.platform === 'gmail' || l.platform === 'mail'
+    )
+    const toEmail = emailLink?.link || 'contact@rithychanvirak.com'
+
+    const mailtoUrl = `mailto:${toEmail}?subject=${encodeURIComponent(formData.subject || 'Portfolio Inquiry from ' + formData.name)}&body=${encodeURIComponent(`Name: ${formData.name}\nEmail: ${formData.email}\n\n${formData.message}`)}`
+    window.open(mailtoUrl, '_blank')
+
+    setTimeout(() => {
+      setFormStatus('sent')
+      setFormData({ name: '', email: '', subject: '', message: '' })
+    }, 500)
+  }
 
   useEffect(() => {
     getContactData().then(data => {
@@ -256,6 +285,104 @@ export default function ContactPage() {
               })}
             </motion.div>
           )}
+
+          {/* Contact Form */}
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.6 }}
+            className="mt-16"
+          >
+            <div className="max-w-2xl mx-auto">
+              <h2 className="text-3xl font-bold text-white text-center mb-2" style={{ fontFamily: 'var(--font-livvic), sans-serif' }}>
+                Send a Message
+              </h2>
+              <p className="text-white/60 text-center mb-8">Have a project in mind? Let&apos;s talk.</p>
+
+              {formStatus === 'sent' ? (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="text-center py-16"
+                >
+                  <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
+                  <h3 className="text-2xl font-bold text-white mb-2">Message Sent!</h3>
+                  <p className="text-white/70 mb-6">Your email client should have opened. Thank you for reaching out!</p>
+                  <button
+                    onClick={() => setFormStatus('idle')}
+                    className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors"
+                  >
+                    Send Another
+                  </button>
+                </motion.div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-sm text-white/70 mb-2">Name <span className="text-pink-400">*</span></label>
+                      <input
+                        type="text"
+                        value={formData.name}
+                        onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
+                        placeholder="Your name"
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 hover:border-white/20 focus:border-white/40 rounded-xl text-white placeholder:text-white/30 outline-none transition-colors"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-white/70 mb-2">Email <span className="text-pink-400">*</span></label>
+                      <input
+                        type="email"
+                        value={formData.email}
+                        onChange={e => setFormData(p => ({ ...p, email: e.target.value }))}
+                        placeholder="your@email.com"
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 hover:border-white/20 focus:border-white/40 rounded-xl text-white placeholder:text-white/30 outline-none transition-colors"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-white/70 mb-2">Subject</label>
+                    <input
+                      type="text"
+                      value={formData.subject}
+                      onChange={e => setFormData(p => ({ ...p, subject: e.target.value }))}
+                      placeholder="What's this about?"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 hover:border-white/20 focus:border-white/40 rounded-xl text-white placeholder:text-white/30 outline-none transition-colors"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-white/70 mb-2">Message <span className="text-pink-400">*</span></label>
+                    <textarea
+                      rows={5}
+                      value={formData.message}
+                      onChange={e => setFormData(p => ({ ...p, message: e.target.value }))}
+                      placeholder="Tell me about your project..."
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 hover:border-white/20 focus:border-white/40 rounded-xl text-white placeholder:text-white/30 outline-none transition-colors resize-none"
+                      required
+                    />
+                  </div>
+
+                  {formError && (
+                    <p className="text-pink-400 text-sm">{formError}</p>
+                  )}
+
+                  <motion.button
+                    type="submit"
+                    disabled={formStatus === 'sending'}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="w-full flex items-center justify-center gap-3 px-8 py-4 bg-white text-black font-bold rounded-xl hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Send className="w-5 h-5" />
+                    {formStatus === 'sending' ? 'Opening email...' : 'Send Message'}
+                  </motion.button>
+                </form>
+              )}
+            </div>
+          </motion.div>
 
         </div>
       </div>

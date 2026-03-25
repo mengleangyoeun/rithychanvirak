@@ -6,6 +6,8 @@ import { Footer } from "@/components/footer"
 import { PrefetchRoutes } from "@/components/prefetch-routes"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { ScrollToTop } from "@/components/scroll-to-top"
+import { NavigationProgress } from "@/components/navigation-progress"
+import { ImageProtection } from "@/components/image-protection"
 import { useScrollRestoration } from "@/hooks/use-scroll-restoration"
 
 export function LayoutWrapper({
@@ -27,6 +29,8 @@ export function LayoutWrapper({
 
   return (
     <ErrorBoundary>
+      <NavigationProgress />
+      <ImageProtection />
       <div className="min-h-screen flex flex-col">
         <PrefetchRoutes />
         <Header />

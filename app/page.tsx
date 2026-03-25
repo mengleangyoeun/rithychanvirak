@@ -126,48 +126,71 @@ export default async function HomePage() {
       const { createClient } = await import('@/lib/supabase/server')
       const supabase = await createClient()
 
-      // Fetch featured collections with photo and sub-album counts
-      const { data: collections, error } = await supabase
+      // Fetch ALL collections (needed to traverse the full hierarchy)
+      const { data: allCollections, error: allError } = await supabase
         .from('collections')
         .select('*')
-        .eq('featured', true)
-        .is('parent_id', null) // Only top-level collections
         .order('order', { ascending: true })
-        .limit(6)
 
-      if (error) {
-        console.error('Error fetching featured collections:', error)
+      if (allError) {
+        console.error('Error fetching collections:', allError)
         return []
       }
 
-      if (!collections || collections.length === 0) {
+      if (!allCollections || allCollections.length === 0) return []
+
+      // Fetch ALL collection-photo links in one query
+      const { data: allLinks, error: linksError } = await supabase
+        .from('collection_photos')
+        .select('collection_id')
+
+      if (linksError) {
+        console.error('Error fetching collection_photos:', linksError)
         return []
       }
 
-      // Fetch stats for each collection
-      const collectionsWithStats = await Promise.all(
-        collections.map(async (collection) => {
-          // Count photos in collection
-          const { count: photoCount } = await supabase
-            .from('collection_photos')
-            .select('*', { count: 'exact', head: true })
-            .eq('collection_id', collection.id)
+      // Build direct photo count map
+      const directPhotoCountMap = new Map<string, number>()
+      for (const link of allLinks || []) {
+        directPhotoCountMap.set(link.collection_id, (directPhotoCountMap.get(link.collection_id) || 0) + 1)
+      }
 
-          // Count sub-albums
-          const { count: subAlbumCount } = await supabase
-            .from('collections')
-            .select('*', { count: 'exact', head: true })
-            .eq('parent_id', collection.id)
+      // Build parent → children map for fast traversal
+      const childrenMap = new Map<string, string[]>()
+      for (const col of allCollections) {
+        if (col.parent_id) {
+          const siblings = childrenMap.get(col.parent_id) || []
+          siblings.push(col.id)
+          childrenMap.set(col.parent_id, siblings)
+        }
+      }
 
-          return {
-            ...collection,
-            totalPhotos: photoCount || 0,
-            subAlbums: subAlbumCount || 0
+      // Recursively count photos and sub-albums (all depths) using BFS
+      const countAll = (rootId: string): { photos: number; subAlbums: number } => {
+        let photos = directPhotoCountMap.get(rootId) || 0
+        let subAlbums = 0
+        const queue = [rootId]
+        while (queue.length > 0) {
+          const current = queue.shift()!
+          const children = childrenMap.get(current) || []
+          for (const childId of children) {
+            photos += directPhotoCountMap.get(childId) || 0
+            subAlbums += 1
+            queue.push(childId)
           }
-        })
-      )
+        }
+        return { photos, subAlbums }
+      }
 
-      return collectionsWithStats
+      // Only return featured top-level collections
+      const featuredRoot = allCollections
+        .filter(col => col.featured && !col.parent_id)
+        .slice(0, 6)
+
+      return featuredRoot.map(collection => {
+        const { photos, subAlbums } = countAll(collection.id)
+        return { ...collection, totalPhotos: photos, subAlbums }
+      })
     } catch (error) {
       console.error('Error fetching featured collections:', error)
       return []
@@ -179,10 +202,11 @@ export default async function HomePage() {
       const { createClient } = await import('@/lib/supabase/server')
       const supabase = await createClient()
 
-      const { data: videos, error } = await supabase
+      const { data: featured, error } = await supabase
         .from('videos')
         .select('*')
         .eq('featured', true)
+        .eq('is_active', true)
         .order('order', { ascending: true })
         .limit(8)
 
@@ -191,8 +215,19 @@ export default async function HomePage() {
         return []
       }
 
-      // Transform to match the Videos component interface
-      return (videos || []).map(video => ({
+      // Fallback: if nothing is featured, show the 4 most-recent active videos
+      let videos = featured || []
+      if (videos.length === 0) {
+        const { data: recent } = await supabase
+          .from('videos')
+          .select('*')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false })
+          .limit(4)
+        videos = recent || []
+      }
+
+      return videos.map(video => ({
         _id: video.id,
         title: video.title,
         slug: { current: video.slug },
@@ -217,7 +252,8 @@ export default async function HomePage() {
         .from('photos')
         .select('*')
         .eq('featured', true)
-        // Photos currently do not have a persistent "order" field in admin.
+        // Sort by admin-defined order first, then fall back to newest
+        .order('order', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: false })
         .limit(12)
 
@@ -226,11 +262,10 @@ export default async function HomePage() {
         return []
       }
 
-      // Transform to match the Works component interface
       return (photos || []).map(photo => ({
         _id: photo.id,
         title: photo.title,
-        slug: { current: photo.id }, // Use ID as slug for now
+        slug: { current: photo.id },
         imageUrl: photo.image_url,
         imageId: photo.image_id,
         alt: photo.alt || photo.title

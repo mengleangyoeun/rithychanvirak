@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter, Livvic } from "next/font/google";
+import { Inter, Livvic } from "next/font/google";
 import "@fontsource/kantumruy-pro/300.css";
 import "@fontsource/kantumruy-pro/400.css";
 import "@fontsource/kantumruy-pro/500.css";
@@ -16,19 +16,6 @@ const inter = Inter({
   preload: true,
 });
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-  display: 'swap',
-  preload: true,
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-  display: 'swap',
-  preload: false, // Only preload critical fonts
-});
 
 const livvic = Livvic({
   weight: ['300', '400', '500', '600', '700', '900'],
@@ -39,7 +26,11 @@ const livvic = Livvic({
 });
 
 export const metadata: Metadata = {
-  title: 'Rithy Chanvirak - Professional Photographer',
+  metadataBase: new URL('https://rithychanvirak.com'),
+  title: {
+    default: 'Rithy Chanvirak - Professional Photographer',
+    template: '%s | Rithy Chanvirak',
+  },
   description: 'Discover stunning photography by Rithy Chanvirak. Specializing in capturing compelling visual stories through professional portrait, event, and creative photography.',
   keywords: ['photography', 'photographer', 'portraits', 'events', 'professional photography', 'Rithy Chanvirak'],
   openGraph: {
@@ -47,11 +38,14 @@ export const metadata: Metadata = {
     description: 'Discover stunning photography by Rithy Chanvirak. Specializing in capturing compelling visual stories.',
     type: 'website',
     locale: 'en_US',
+    siteName: 'Rithy Chanvirak',
+    images: [{ url: '/images/logo/logo_white.png', width: 1200, height: 630, alt: 'Rithy Chanvirak Photography' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Rithy Chanvirak - Professional Photographer',
     description: 'Discover stunning photography by Rithy Chanvirak. Specializing in capturing compelling visual stories.',
+    images: ['/images/logo/logo_white.png'],
   }
 };
 
@@ -72,7 +66,7 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body
-        className={`${inter.variable} ${geistSans.variable} ${geistMono.variable} ${livvic.variable} antialiased min-h-screen flex flex-col`}
+        className={`${inter.variable} ${livvic.variable} antialiased min-h-screen flex flex-col`}
       >
         <LayoutWrapper>{children}</LayoutWrapper>
         <Analytics />

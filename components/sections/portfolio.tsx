@@ -85,25 +85,21 @@ export function Portfolio({ collections, loading = false, showTitle = true }: { 
                   )}
 
                   {/* Gradient Overlay - always visible, stronger on hover */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent md:from-black/40 md:via-black/10 md:group-hover:from-black/80 md:group-hover:via-black/30 transition-all duration-500"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent transition-all duration-500"></div>
 
                   {/* Content - always visible on mobile, shown on hover on desktop */}
-                  <div className="absolute inset-0 p-4 sm:p-6 flex flex-col justify-end md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
+                  <div className="absolute inset-0 p-4 sm:p-6 flex flex-col justify-end">
                     <h3
-                      className="text-xl sm:text-2xl font-bold text-white mb-2 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300"
+                      className="text-xl sm:text-2xl font-bold text-white mb-2"
                       style={{ fontFamily: /[\u1780-\u17FF]/.test(collection.title) ? '"Kantumruy Pro", sans-serif' : 'var(--font-livvic), sans-serif' }}
                     >
                       {collection.title}
                     </h3>
 
-                    {collection.description && (
-                      <p className="text-xs sm:text-sm text-white/80 mb-3 sm:mb-4 line-clamp-2 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300 md:delay-75">
-                        {collection.description}
-                      </p>
-                    )}
+
 
                     {/* Stats */}
-                    <div className="flex items-center gap-3 sm:gap-4 text-xs text-white/70 md:transform md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300 md:delay-100">
+                    <div className="flex items-center gap-3 sm:gap-4 text-xs text-white/70">
                       <div className="flex items-center gap-1 sm:gap-1.5">
                         <span>📸</span>
                         <span>{collection.totalPhotos}</span>
