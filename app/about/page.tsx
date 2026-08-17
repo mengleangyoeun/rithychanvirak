@@ -257,7 +257,7 @@ export default function AboutPage() {
             {/* Quick Stats / Highlights */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 pt-4 border-t border-zinc-800/80">
               <div className="p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/70">
-                <div className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">4f+</div>
+                <div className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">4+</div>
                 <div className="text-xs text-zinc-400 mt-0.5">Years Experience</div>
               </div>
               <div className="p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/70">
