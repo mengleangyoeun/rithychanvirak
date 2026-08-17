@@ -28,7 +28,7 @@ export function CollectionCardSkeleton() {
 
 export function CollectionCardSkeletonPortfolio() {
   return (
-    <div className="relative h-80 sm:h-96 overflow-hidden rounded-2xl sm:rounded-3xl bg-white/5 backdrop-blur-sm border border-white/10">
+    <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
       {/* Image skeleton */}
       <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-white/5 to-white/10 animate-pulse" />
 

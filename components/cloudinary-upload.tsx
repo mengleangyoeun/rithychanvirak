@@ -2,10 +2,12 @@
 
 import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { Upload, X, Loader2, Image as ImageIcon, Zap } from 'lucide-react'
+import { Upload, X, Loader2, Image as ImageIcon, Zap, Crop } from 'lucide-react'
 import Image from 'next/image'
 import { toast } from 'sonner'
 import imageCompression from 'browser-image-compression'
+import { ImageCropper } from '@/components/image-cropper'
+import getCroppedImg from '@/lib/crop-image'
 
 interface CloudinaryUploadResponse {
   public_id: string
@@ -34,6 +36,7 @@ interface CloudinaryUploadProps {
   currentImageUrl?: string
   currentImageId?: string
   folder?: string
+  cropAspect?: number
 }
 
 // Compression settings - same as bulk upload
@@ -45,11 +48,13 @@ const COMPRESSION_OPTIONS = {
   initialQuality: 0.9
 }
 
-export function CloudinaryUpload({ onUploadComplete, currentImageUrl, currentImageId, folder }: CloudinaryUploadProps) {
+export function CloudinaryUpload({ onUploadComplete, currentImageUrl, currentImageId, folder, cropAspect }: CloudinaryUploadProps) {
   const [uploading, setUploading] = useState(false)
   const [preview, setPreview] = useState<string | null>(currentImageUrl || null)
   const [isDragging, setIsDragging] = useState(false)
   const [compressionStatus, setCompressionStatus] = useState<string>('')
+  const [cropFileUrl, setCropFileUrl] = useState<string | null>(null)
+  
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dragCounter = useRef(0)
 
@@ -105,24 +110,15 @@ export function CloudinaryUpload({ onUploadComplete, currentImageUrl, currentIma
     )
 
     if (!response.ok) {
-      throw new Error('Upload failed')
+      const errText = await response.text()
+      console.error('Cloudinary Error:', errText)
+      throw new Error(`Upload failed: ${errText}`)
     }
 
     return response.json() as Promise<CloudinaryUploadResponse>
   }
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    // Validate file type only
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file')
-      return
-    }
-
-    // NO size limit - we'll compress if needed!
-
+  const processAndUploadFile = async (file: File) => {
     setUploading(true)
 
     try {
@@ -150,9 +146,46 @@ export function CloudinaryUpload({ onUploadComplete, currentImageUrl, currentIma
       })
     } catch (error) {
       console.error('Upload error:', error)
-      toast.error('Failed to upload image')
-      setPreview(null)
+      toast.error('Failed to upload image. Please try again.')
     } finally {
+      setUploading(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file type only
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file')
+      return
+    }
+
+    if (cropAspect) {
+      const url = URL.createObjectURL(file)
+      setCropFileUrl(url)
+    } else {
+      await processAndUploadFile(file)
+    }
+  }
+
+  const handleCropComplete = async (croppedAreaPixels: { x: number; y: number; width: number; height: number }) => {
+    if (!cropFileUrl) return
+    
+    setUploading(true)
+    try {
+      const croppedFile = await getCroppedImg(cropFileUrl, croppedAreaPixels)
+      if (croppedFile) {
+        setCropFileUrl(null)
+        await processAndUploadFile(croppedFile)
+      }
+    } catch (e) {
+      console.error(e)
+      toast.error('Failed to crop image')
       setUploading(false)
     }
   }
@@ -257,6 +290,21 @@ export function CloudinaryUpload({ onUploadComplete, currentImageUrl, currentIma
             fill
             className="object-contain"
           />
+          {cropAspect && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              className="absolute top-2 right-12 opacity-80 hover:opacity-100 transition-opacity"
+              onClick={() => {
+                setCropFileUrl(preview)
+              }}
+              disabled={uploading}
+              title="Crop Image"
+            >
+              <Crop className="w-4 h-4" />
+            </Button>
+          )}
           <Button
             type="button"
             variant="destructive"
@@ -317,6 +365,20 @@ export function CloudinaryUpload({ onUploadComplete, currentImageUrl, currentIma
         <p className="text-xs text-muted-foreground">
           Current: {currentImageId}
         </p>
+      )}
+      
+      {cropFileUrl && (
+        <ImageCropper
+          imageSrc={cropFileUrl}
+          aspect={cropAspect}
+          onCropComplete={handleCropComplete}
+          onCancel={() => {
+            setCropFileUrl(null)
+            if (fileInputRef.current) {
+              fileInputRef.current.value = ''
+            }
+          }}
+        />
       )}
     </div>
   )

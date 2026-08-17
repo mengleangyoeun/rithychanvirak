@@ -17,62 +17,53 @@ interface Video {
   year?: number
 }
 
+function getVideoThumbnail(vid: Video) {
+  if (vid.thumbnailUrl) return vid.thumbnailUrl
+
+  if (vid.videoType === 'youtube') {
+    const videoId = vid.videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/)?.[1]
+    if (videoId) return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+  } else if (vid.videoType === 'vimeo') {
+    const videoId = vid.videoUrl.match(/vimeo\.com\/(\d+)/)?.[1]
+    if (videoId) return `https://vumbnail.com/${videoId}.jpg`
+  }
+
+  return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect width="800" height="450" fill="%23111827"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="system-ui" font-size="24" fill="%23ffffff40"%3ENo Thumbnail%3C/text%3E%3C/svg%3E'
+}
+
+function getEmbedUrl(vid: Video) {
+  if (vid.videoType === 'youtube') {
+    const videoId = vid.videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/)?.[1]
+    return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${videoId}`
+  } else if (vid.videoType === 'vimeo') {
+    const videoId = vid.videoUrl.match(/vimeo\.com\/(\d+)/)?.[1]
+    return `https://player.vimeo.com/video/${videoId}?autoplay=1&muted=1&loop=1&controls=0&background=1`
+  } else if (vid.videoType === 'googledrive') {
+    const fileIdMatch = vid.videoUrl.match(/\/d\/([^/]+)/) || vid.videoUrl.match(/[?&]id=([^&]+)/)
+    const fileId = fileIdMatch?.[1]
+    if (fileId) return `https://drive.google.com/file/d/${fileId}/preview`
+  }
+  return vid.videoUrl
+}
+
 function VideoCard({ video, index }: { video: Video; index: number }) {
   const [isHovered, setIsHovered] = useState(false)
   const [embedError, setEmbedError] = useState(false)
 
-  const getVideoThumbnail = (vid: Video) => {
-    if (vid.thumbnailUrl) {
-      return vid.thumbnailUrl
-    }
-
-    if (vid.videoType === 'youtube') {
-      const videoId = vid.videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/)?.[1]
-      if (videoId) {
-        return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
-      }
-    } else if (vid.videoType === 'vimeo') {
-      const videoId = vid.videoUrl.match(/vimeo\.com\/(\d+)/)?.[1]
-      if (videoId) {
-        return `https://vumbnail.com/${videoId}.jpg`
-      }
-    }
-
-    return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect width="800" height="450" fill="%23111827"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="system-ui" font-size="24" fill="%23ffffff40"%3ENo Thumbnail%3C/text%3E%3C/svg%3E'
-  }
-
-  const getEmbedUrl = (vid: Video) => {
-    if (vid.videoType === 'youtube') {
-      const videoId = vid.videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/)?.[1]
-      return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${videoId}`
-    } else if (vid.videoType === 'vimeo') {
-      const videoId = vid.videoUrl.match(/vimeo\.com\/(\d+)/)?.[1]
-      return `https://player.vimeo.com/video/${videoId}?autoplay=1&muted=1&loop=1&controls=0&background=1`
-    } else if (vid.videoType === 'googledrive') {
-      const fileIdMatch = vid.videoUrl.match(/\/d\/([^/]+)/) || vid.videoUrl.match(/[?&]id=([^&]+)/)
-      const fileId = fileIdMatch?.[1]
-      if (fileId) {
-        return `https://drive.google.com/file/d/${fileId}/preview`
-      }
-    }
-    return vid.videoUrl
-  }
-
   return (
     <motion.div
-      initial={{ opacity: 0, y: 40 }}
+      initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: index * 0.1 }}
+      transition={{ duration: 0.45, delay: index * 0.1 }}
       viewport={{ once: true, margin: "-50px" }}
-      whileHover={{ y: -8 }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className="group"
     >
       <Link href={`/video/${video.slug.current}`}>
-        <div className="relative aspect-video overflow-hidden rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 transition-all duration-500 hover:border-white/20 hover:bg-white/10">
+        <div className="relative aspect-video overflow-hidden rounded-2xl bg-zinc-800/50 border border-white/[0.06] transition-all duration-500 hover:border-white/15 hover:shadow-2xl hover:shadow-black/30">
 
-          {/* Thumbnail - Hidden on hover */}
+          {/* Thumbnail */}
           <AnimatePresence mode="wait">
             {!isHovered && (
               <motion.div
@@ -87,15 +78,15 @@ function VideoCard({ video, index }: { video: Video; index: number }) {
                   alt={video.title}
                   fill
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                  className="object-cover"
-                  loading={index < 3 ? "eager" : "lazy"}
-                  priority={index < 3}
+                  className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                  loading={index < 2 ? "eager" : "lazy"}
+                  priority={index < 2}
                 />
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Video Preview - Shown on hover */}
+          {/* Video preview on hover */}
           <AnimatePresence>
             {isHovered && (
               <motion.div
@@ -129,53 +120,42 @@ function VideoCard({ video, index }: { video: Video; index: number }) {
             )}
           </AnimatePresence>
 
-          {/* Gradient Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent group-hover:from-black/40 transition-all duration-500 z-20"></div>
+          {/* Gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent group-hover:from-black/40 transition-all duration-500 z-20" />
 
-          {/* Play Button - Hidden on hover */}
+          {/* Play button */}
           <AnimatePresence>
             {!isHovered && (
               <motion.div
                 key="play"
                 initial={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: 0.3 }}
+                transition={{ duration: 0.25 }}
                 className="absolute inset-0 flex items-center justify-center z-30"
               >
-                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center group-hover:bg-white/30 group-hover:scale-110 transition-all duration-300">
-                  <Play className="w-6 h-6 sm:w-8 sm:h-8 text-white ml-0.5 sm:ml-1" fill="white" />
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/15 transition-all duration-300 group-hover:scale-110 group-hover:bg-white/20">
+                  <Play className="w-5 h-5 sm:w-6 sm:h-6 text-white ml-0.5" fill="white" />
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Info Overlay - Slides down and fades out on hover */}
+          {/* Info overlay */}
           <motion.div
-            className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 z-30"
+            className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 z-30"
             animate={{
-              y: isHovered ? 20 : 0,
+              y: isHovered ? 16 : 0,
               opacity: isHovered ? 0 : 1
             }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
           >
-            <div className="flex items-start justify-between gap-2 sm:gap-4">
-              <div className="flex-1">
-                <h3 className="text-base sm:text-lg md:text-xl font-bold text-white mb-1 sm:mb-2 line-clamp-2">
-                  {video.title}
-                </h3>
-                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs text-white/60">
-                  {video.category && (
-                    <span className="px-2 py-0.5 sm:px-3 sm:py-1 bg-white/10 rounded-full">
-                      {video.category}
-                    </span>
-                  )}
-                  {video.year && (
-                    <span className="px-2 py-0.5 sm:px-3 sm:py-1 bg-white/10 rounded-full">
-                      {video.year}
-                    </span>
-                  )}
-                </div>
-              </div>
+            <h3 className="text-sm sm:text-base font-medium text-white mb-1.5 line-clamp-2 leading-snug">
+              {video.title}
+            </h3>
+            <div className="flex items-center gap-1.5 text-xs text-white/50">
+              {video.category && <span>{video.category}</span>}
+              {video.category && video.year && <span className="text-white/20">·</span>}
+              {video.year && <span>{video.year}</span>}
             </div>
           </motion.div>
 
@@ -189,41 +169,33 @@ export function Videos({ videos }: { videos: Video[] }) {
   if (!videos || videos.length === 0) return null
 
   return (
-    <section className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6 overflow-hidden">
-      <div className="relative max-w-7xl mx-auto">
-        {/* Section Title */}
-        <div className="text-center mb-12 sm:mb-16 md:mb-20">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            viewport={{ once: true, margin: "-100px" }}
-          >
-            <h2
-              className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-[0.08em] sm:tracking-[0.1em] uppercase mb-4 sm:mb-6 px-4"
-              style={{ fontFamily: 'var(--font-livvic), sans-serif' }}
-            >
-              Videos
-            </h2>
-            <motion.div
-              className="w-16 sm:w-24 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 rounded-full mx-auto mb-4 sm:mb-6"
-              initial={{ width: 0 }}
-              whileInView={{ width: 96 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              viewport={{ once: true }}
-            />
-            <p className="text-white/70 text-sm sm:text-base md:text-lg lg:text-xl max-w-3xl mx-auto leading-relaxed px-4">
-              Explore my latest videography work and creative projects
-            </p>
-          </motion.div>
+    <section className="bg-zinc-900/40 border border-zinc-800/60 rounded-3xl p-6 sm:p-10 hover:border-zinc-700/80 transition-colors duration-500 relative flex flex-col h-full">
+      {/* Header */}
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-medium tracking-tight text-white uppercase mb-2">
+            Featured Videos
+          </h2>
+          <p className="text-zinc-400 text-sm">
+            Explore my latest videography work and creative projects.
+          </p>
         </div>
+        <Link
+          href="/videos"
+          className="text-sm text-zinc-400 hover:text-white transition-colors duration-300 flex items-center gap-1.5 shrink-0 mt-1 group"
+        >
+          View all
+          <svg className="w-3.5 h-3.5 transition-transform duration-300 group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+      </div>
 
-        {/* Video Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 lg:gap-10 max-w-5xl mx-auto">
-          {videos.map((video, index) => (
-            <VideoCard key={video._id} video={video} index={index} />
-          ))}
-        </div>
+      {/* Video Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {videos.slice(0, 4).map((video, index) => (
+          <VideoCard key={video._id} video={video} index={index} />
+        ))}
       </div>
     </section>
   )

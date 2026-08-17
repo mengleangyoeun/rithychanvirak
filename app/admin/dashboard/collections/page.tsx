@@ -36,17 +36,29 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator } from '@/components/ui/context-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import {
   Plus, Pencil, Folder, RefreshCw, Trash2, ArrowLeft, Loader2,
-  Search, Grid3X3, List, Home, FileImage, Settings, Camera
+  Search, Grid3X3, List, Home, FileImage, Settings, Camera, Star, Check,
+  MoreVertical, ExternalLink, Eye, ImageIcon, Layers, MoveRight, ChevronRight, X,
+  ArrowUp, ArrowDown
 } from 'lucide-react'
 import Image from 'next/image'
 import { toast } from 'sonner'
 import { getOptimizedImageUrl, getThumbnailUrl } from '@/lib/cloudinary'
+
+export interface EnhancedCollection extends Collection {
+  previewPhotos?: string[]
+  directPhotoCount?: number
+  totalPhotoCount?: number
+  subAlbumsCount?: number
+}
 import {
   DndContext,
   closestCenter,
@@ -69,6 +81,123 @@ import { CSS } from '@dnd-kit/utilities'
 
 type ViewMode = 'grid' | 'list' | 'details'
 type ItemType = 'folder' | 'file'
+
+// Sortable Featured Item Component
+function SortableFeaturedItem({
+  collection,
+  index,
+  total,
+  onMoveUp,
+  onMoveDown,
+  onUnfeature
+}: {
+  collection: EnhancedCollection
+  index: number
+  total: number
+  onMoveUp: () => void
+  onMoveDown: () => void
+  onUnfeature: () => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: collection.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`group flex items-center gap-3 p-2.5 sm:p-3 bg-zinc-900/90 hover:bg-zinc-900 rounded-xl border transition-all duration-200 ${
+        isDragging
+          ? 'opacity-60 border-white/60 shadow-2xl z-30 scale-[1.02] ring-1 ring-white/30'
+          : 'border-zinc-800 hover:border-zinc-700 shadow-sm'
+      }`}
+    >
+      {/* Drag Handle */}
+      <div 
+        {...attributes} 
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 touch-none shrink-0 transition-colors"
+        title="Drag to reorder"
+      >
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 9h8M8 15h8" />
+        </svg>
+      </div>
+
+      {/* Position Badge */}
+      <span className="w-6 h-6 rounded-lg bg-zinc-800 text-zinc-300 font-bold text-xs flex items-center justify-center shrink-0 border border-zinc-700/60">
+        #{index + 1}
+      </span>
+
+      {/* Album Cover Thumbnail */}
+      <div className="w-11 h-11 rounded-lg overflow-hidden bg-zinc-950 border border-zinc-800 relative shrink-0">
+        {collection.cover_image_url ? (
+          <Image src={collection.cover_image_url} alt={collection.title} fill className="object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-zinc-600 bg-zinc-900">
+            <Folder className="w-5 h-5 text-zinc-500" />
+          </div>
+        )}
+      </div>
+
+      {/* Album Title & Meta */}
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-sm text-white truncate">{collection.title}</p>
+        <p className="text-xs text-zinc-400 mt-0.5">
+          {collection.totalPhotoCount ?? 0} photos
+        </p>
+      </div>
+
+      {/* Quick Move Up/Down & Unfeature */}
+      <div className="flex items-center gap-1 shrink-0">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          disabled={index === 0}
+          onClick={(e) => {
+            e.stopPropagation()
+            onMoveUp()
+          }}
+          className="h-7 w-7 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-20"
+          title="Move Up"
+        >
+          <ArrowUp className="w-3.5 h-3.5" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          disabled={index === total - 1}
+          onClick={(e) => {
+            e.stopPropagation()
+            onMoveDown()
+          }}
+          className="h-7 w-7 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-20"
+          title="Move Down"
+        >
+          <ArrowDown className="w-3.5 h-3.5" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={(e) => {
+            e.stopPropagation()
+            onUnfeature()
+          }}
+          className="h-7 w-7 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-950/40 transition-colors ml-1"
+          title="Remove from Featured"
+        >
+          <X className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 // Sortable Collection Item Component
 function SortableCollectionItem({
@@ -106,18 +235,26 @@ function SortableCollectionItem({
     transition,
   }
 
+  const colData = item.data as EnhancedCollection
+  const previewImages = (colData?.previewPhotos && colData.previewPhotos.length > 0)
+    ? colData.previewPhotos
+    : (colData?.cover_image_url ? [colData.cover_image_url] : [])
+
+  const isSelected = selectedItems.has(item.id)
+
   return (
     <ContextMenu>
-      <ContextMenuTrigger>
+      <ContextMenuTrigger asChild>
         <div
           ref={setNodeRef}
           style={style}
-          className={`group relative rounded-xl border cursor-pointer hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 ease-out ${
-            selectedItems.has(item.id) ? 'bg-accent border-primary shadow-md' : 'border-border hover:border-primary/50'
-          } ${isDragging ? 'opacity-50' : ''}`}
+          className={`group relative rounded-2xl border transition-all duration-200 ease-out flex flex-col overflow-hidden select-none cursor-pointer ${
+            isSelected
+              ? 'bg-zinc-900 border-white/60 shadow-lg ring-1 ring-white/40'
+              : 'border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 hover:border-zinc-700 shadow-sm hover:shadow-xl'
+          } ${isDragging ? 'opacity-40 scale-[0.98] z-30' : ''}`}
           onClick={(e) => {
-            // If checkbox was clicked, don't navigate
-            if ((e.target as HTMLElement).closest('[data-checkbox]') || (e.target as HTMLElement).closest('[data-drag-handle]')) {
+            if ((e.target as HTMLElement).closest('[data-no-nav]')) {
               e.stopPropagation()
               return
             }
@@ -131,99 +268,196 @@ function SortableCollectionItem({
             }
           }}
         >
-          {/* Drag Handle */}
-          <div
-            data-drag-handle
-            {...attributes}
-            {...listeners}
-            className={`absolute top-2 right-2 z-10 w-6 h-6 flex items-center justify-center rounded ${
-              dragDisabled
-                ? 'cursor-not-allowed opacity-40'
-                : 'cursor-grab active:cursor-grabbing hover:bg-black/20'
-            }`}
-          >
-            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M3 4h14a1 1 0 010 2H3a1 1 0 010-2zM3 8h14a1 1 0 010 2H3a1 1 0 010-2zM3 12h14a1 1 0 010 2H3a1 1 0 010-2z"/>
-            </svg>
-          </div>
+          {/* Card Media Preview */}
+          <div className="aspect-[4/3] relative overflow-hidden bg-zinc-950">
+            {previewImages.length > 0 ? (
+              <div className="w-full h-full relative">
+                {previewImages.slice(0, 3).reverse().map((url: string, i: number, arr: string[]) => {
+                  const offset = arr.length - 1 - i
+                  let transformClass = 'z-30 group-hover:scale-105'
+                  if (offset === 1) transformClass = 'z-20 scale-[0.93] -translate-y-2.5 opacity-75 shadow-md'
+                  if (offset === 2) transformClass = 'z-10 scale-[0.86] -translate-y-5 opacity-50 shadow-lg'
 
-          {/* Selection Checkbox */}
-          <div
-            data-checkbox
-            className="absolute top-2 left-2 z-10"
-            onClick={(e) => {
-              e.stopPropagation()
-              const newSelected = new Set(selectedItems)
-              if (newSelected.has(item.id)) {
-                newSelected.delete(item.id)
-              } else {
-                newSelected.add(item.id)
-              }
-              setSelectedItems(newSelected)
-            }}
-          >
-            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-              selectedItems.has(item.id)
-                ? 'bg-primary border-primary text-primary-foreground'
-                : 'border-white/50 bg-black/20 hover:border-white/70'
-            }`}>
-              {selectedItems.has(item.id) && (
-                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-              )}
+                  return (
+                    <Image
+                      key={i}
+                      src={url}
+                      alt={item.name}
+                      fill
+                      className={`object-cover absolute inset-0 transition-all duration-300 ${transformClass}`}
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                    />
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-zinc-900/60 to-zinc-950 text-zinc-600 gap-2">
+                <Folder className="w-12 h-12 text-zinc-700 group-hover:text-zinc-500 transition-colors" />
+                <span className="text-[11px] font-medium text-zinc-500">Empty Album</span>
+              </div>
+            )}
+
+            {/* Dark Vignette Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity pointer-events-none" />
+
+            {/* Top Badges & Select Controls */}
+            <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between z-20">
+              {/* Checkbox */}
+              <button
+                type="button"
+                data-no-nav
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const next = new Set(selectedItems)
+                  if (next.has(item.id)) {
+                    next.delete(item.id)
+                  } else {
+                    next.add(item.id)
+                  }
+                  setSelectedItems(next)
+                }}
+                className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all ${
+                  isSelected
+                    ? 'bg-white border-white text-black shadow-md'
+                    : 'border-white/40 bg-black/40 text-transparent hover:border-white hover:bg-black/60 backdrop-blur-md'
+                }`}
+                aria-label={isSelected ? 'Deselect album' : 'Select album'}
+              >
+                <Check className={`w-3.5 h-3.5 stroke-[3] ${isSelected ? 'opacity-100' : 'opacity-0'}`} />
+              </button>
+
+              <div className="flex items-center gap-1.5">
+                {colData?.featured && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1 backdrop-blur-md shadow-sm">
+                    <Star className="w-2.5 h-2.5 fill-amber-300" /> Featured
+                  </span>
+                )}
+
+                {/* Drag Handle */}
+                <div
+                  data-no-nav
+                  {...attributes}
+                  {...listeners}
+                  className={`w-6 h-6 flex items-center justify-center rounded-lg bg-black/40 border border-white/20 backdrop-blur-md text-white/80 transition-colors ${
+                    dragDisabled
+                      ? 'cursor-not-allowed opacity-30'
+                      : 'cursor-grab active:cursor-grabbing hover:text-white hover:bg-black/60'
+                  }`}
+                  title="Drag to reorder"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 9h8M8 15h8" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Hover Quick Action Buttons */}
+            <div className="absolute inset-0 z-20 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 backdrop-blur-[2px]">
+              <Button
+                type="button"
+                data-no-nav
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenFolder(item.id)
+                }}
+                className="rounded-xl bg-white text-black hover:bg-zinc-200 text-xs font-semibold h-8 px-3 shadow-lg"
+              >
+                Open Album
+              </Button>
+              <Button
+                type="button"
+                data-no-nav
+                variant="outline"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onEdit(item)
+                }}
+                className="rounded-xl border-white/30 bg-black/60 text-white hover:bg-black hover:border-white text-xs h-8 w-8 shadow-lg"
+                title="Edit Settings"
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </Button>
             </div>
           </div>
 
-          <div className="aspect-[4/3] relative overflow-hidden rounded-t-xl bg-muted">
-            {item.type === 'folder' ? (
-              item.data && 'cover_image_url' in item.data && item.data.cover_image_url ? (
-                <Image
-                  src={item.data.cover_image_url}
-                  alt={item.name}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-200"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100">
-                  <Folder className="w-24 h-24 text-blue-500" />
-                </div>
-              )
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-                <FileImage className="w-24 h-24 text-gray-500" />
-              </div>
-            )}
-          </div>
-          <div className="p-3 bg-background rounded-b-xl">
-            <p className="text-sm font-semibold tracking-tight text-center truncate" title={item.name}>
-              {item.name}
-            </p>
-            {item.type === 'folder' && (
-              <p className="text-xs text-muted-foreground text-center mt-1">
-                Album
+          {/* Card Bottom Meta */}
+          <div className="p-3.5 bg-zinc-950/90 border-t border-zinc-800 flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-white tracking-tight truncate group-hover:text-primary transition-colors text-left" title={item.name}>
+                {item.name}
               </p>
-            )}
+              <div className="flex items-center gap-2 text-xs text-zinc-400 mt-1">
+                {colData?.subAlbumsCount ? (
+                  <span>{colData.subAlbumsCount} sub-albums · {colData.totalPhotoCount ?? 0} photos</span>
+                ) : (
+                  <span>{colData?.directPhotoCount ?? colData?.totalPhotoCount ?? 0} photos</span>
+                )}
+              </div>
+            </div>
+
+            {/* Mobile / Direct More Menu */}
+            <div data-no-nav>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800"
+                  >
+                    <MoreVertical className="w-3.5 h-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40 border-zinc-800 bg-zinc-950 text-white">
+                  <DropdownMenuItem onClick={() => onEdit(item)}>
+                    <Settings className="w-4 h-4 mr-2" />
+                    Edit Album
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onRename(item)}>
+                    <Pencil className="w-4 h-4 mr-2" />
+                    Rename
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onShowProperties(item)}>
+                    <Layers className="w-4 h-4 mr-2" />
+                    Properties
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-zinc-800" />
+                  <DropdownMenuItem
+                    onClick={() => onDelete(item.id)}
+                    className="text-red-400 focus:text-red-300 focus:bg-red-950/50"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
       </ContextMenuTrigger>
-      <ContextMenuContent>
+      <ContextMenuContent className="border-zinc-800 bg-zinc-950 text-white">
+        <ContextMenuItem onClick={() => onOpenFolder(item.id)}>
+          <Folder className="w-4 h-4 mr-2" />
+          Open Album
+        </ContextMenuItem>
         <ContextMenuItem onClick={() => onEdit(item)}>
           <Settings className="w-4 h-4 mr-2" />
-          Edit
+          Edit Settings
         </ContextMenuItem>
         <ContextMenuItem onClick={() => onRename(item)}>
           <Pencil className="w-4 h-4 mr-2" />
           Rename
         </ContextMenuItem>
         <ContextMenuItem onClick={() => onShowProperties(item)}>
-          <Settings className="w-4 h-4 mr-2" />
+          <Layers className="w-4 h-4 mr-2" />
           Properties
         </ContextMenuItem>
-        <ContextMenuSeparator />
+        <ContextMenuSeparator className="bg-zinc-800" />
         <ContextMenuItem
           onClick={() => onDelete(item.id)}
-          className="text-destructive"
+          className="text-red-400 focus:text-red-300 focus:bg-red-950/50"
         >
           <Trash2 className="w-4 h-4 mr-2" />
           Delete
@@ -313,9 +547,90 @@ export default function CollectionsPage() {
     }
   }
 
+  const updateFeaturedOrder = async (orderedFeatured: Collection[]) => {
+    try {
+      const updatedAll = [...allCollections];
+      orderedFeatured.forEach((c, index) => {
+        const target = updatedAll.find(item => item.id === c.id);
+        if (target) target.order = index;
+      });
+      setAllCollections(updatedAll);
+      
+      if (currentPath.length === 0) {
+        const updatedCurrent = currentItems.map(item => {
+          if (item.type === 'folder') {
+            const found = orderedFeatured.find(f => f.id === item.id);
+            if (found) return { ...item, data: { ...item.data, order: orderedFeatured.indexOf(found) } };
+          }
+          return item;
+        }).sort((a, b) => {
+          if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
+          if (a.type === 'folder' && b.type === 'folder') {
+            return ((a.data as Collection).order || 0) - ((b.data as Collection).order || 0);
+          }
+          return new Date((b.data as Photo).created_at || 0).getTime() - new Date((a.data as Photo).created_at || 0).getTime();
+        });
+        setCurrentItems(updatedCurrent);
+      }
+
+      for (let i = 0; i < orderedFeatured.length; i++) {
+        await supabase.from('collections').update({ order: i }).eq('id', orderedFeatured[i].id);
+      }
+      await revalidatePublicPaths(['/', '/gallery'])
+    } catch (error) {
+      console.error('Error updating order:', error)
+      toast.error('Failed to update order')
+      loadAllCollections()
+    }
+  }
+  const handleFeaturedDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const featuredItems = allCollections
+      .filter(c => c.featured && !c.parent_id)
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+
+    const oldIndex = featuredItems.findIndex(f => f.id === active.id)
+    const newIndex = featuredItems.findIndex(f => f.id === over.id)
+
+    const newArray = arrayMove(featuredItems, oldIndex, newIndex)
+    updateFeaturedOrder(newArray)
+  }
+
+  const moveFeaturedItem = (index: number, direction: 'up' | 'down') => {
+    const featuredItems = allCollections
+      .filter(c => c.featured && !c.parent_id)
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+
+    const targetIndex = direction === 'up' ? index - 1 : index + 1
+    if (targetIndex < 0 || targetIndex >= featuredItems.length) return
+
+    const newArray = arrayMove(featuredItems, index, targetIndex)
+    updateFeaturedOrder(newArray)
+  }
+
+  const handleUnfeature = async (collection: Collection) => {
+    try {
+      const { error } = await supabase
+        .from('collections')
+        .update({ featured: false })
+        .eq('id', collection.id)
+
+      if (error) throw error
+
+      toast.success(`Removed "${collection.title}" from featured`)
+      await revalidatePublicPaths(['/', '/gallery'])
+      await loadAllCollections()
+    } catch (err) {
+      console.error('Error removing from featured:', err)
+      toast.error('Failed to update featured album')
+    }
+  }
+
   // Core state
   const [currentPath, setCurrentPath] = useState<string[]>([])
-  const [allCollections, setAllCollections] = useState<Collection[]>([])
+  const [allCollections, setAllCollections] = useState<EnhancedCollection[]>([])
   const [currentItems, setCurrentItems] = useState<FileExplorerItem[]>([])
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState('')
@@ -331,10 +646,16 @@ export default function CollectionsPage() {
   const [editingPhoto, setEditingPhoto] = useState<Photo | null>(null)
   const [photoDeleteProgress, setPhotoDeleteProgress] = useState<{ current: number; total: number } | null>(null)
   const [photoRenderCount, setPhotoRenderCount] = useState(120)
-  const [isToolbarElevated, setIsToolbarElevated] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<{
+    title: string
+    description: string
+    confirmText: string
+    action: () => Promise<void>
+  } | null>(null)
 
   // UI state
   const [showCreateFolder, setShowCreateFolder] = useState(false)
+  const [showFeaturedOrder, setShowFeaturedOrder] = useState(false)
   const [showRenameDialog, setShowRenameDialog] = useState(false)
   const [showProperties, setShowProperties] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
@@ -371,36 +692,163 @@ export default function CollectionsPage() {
   // Error state
   const [error, setError] = useState<string | null>(null)
 
-  // Optimized data loading with error handling
-  const loadInitialData = useCallback(async () => {
+  // Core data loading with accurate recursive photo counting
+  const loadAllCollections = useCallback(async () => {
     try {
       setError(null)
       setLoadingStates(prev => ({ ...prev, loading: true }))
 
-      // Parallel data loading
-      const [collectionsResult] = await Promise.allSettled([
-        supabase.from('collections').select('*').order('created_at', { ascending: false })
-      ])
+      // 1. Fetch all collections
+      const { data: allCollectionsData, error: colError } = await supabase
+        .from('collections')
+        .select('*')
+        .order('created_at', { ascending: false })
 
-      // Handle collections
-      if (collectionsResult.status === 'fulfilled') {
-        setAllCollections(collectionsResult.value.data || [])
-      } else {
-        console.error('Error loading collections:', collectionsResult.reason)
-        setError('Failed to load collections')
+      if (colError) throw colError
+
+      // 2. Fetch all collection_photos in batches to bypass PostgREST 1,000-row limit
+      const allCollectionPhotoLinks: {
+        collection_id: string
+        photo_id: string
+        order: number
+        photos: { id: string; image_url?: string } | { id: string; image_url?: string }[] | null
+      }[] = []
+
+      let from = 0
+      const PAGE_SIZE = 1000
+      let hasMore = true
+
+      while (hasMore) {
+        const { data: batch, error: linksError } = await supabase
+          .from('collection_photos')
+          .select(`
+            collection_id,
+            photo_id,
+            order,
+            photos ( id, image_url )
+          `)
+          .range(from, from + PAGE_SIZE - 1)
+
+        if (linksError) {
+          console.error('Error fetching collection_photos batch:', linksError)
+          break
+        }
+
+        if (batch && batch.length > 0) {
+          allCollectionPhotoLinks.push(...(batch as unknown as typeof allCollectionPhotoLinks))
+          if (batch.length < PAGE_SIZE) {
+            hasMore = false
+          } else {
+            from += PAGE_SIZE
+          }
+        } else {
+          hasMore = false
+        }
       }
 
-    } catch (err) {
-      console.error('Error in loadInitialData:', err)
-      setError('Failed to load data. Please refresh the page.')
+      // 3. Build maps for direct photo IDs and preview collage images
+      const directPhotoIdsMap = new Map<string, Set<string>>()
+      const directPhotosMap = new Map<string, { url: string; order: number }[]>()
+
+      for (const link of allCollectionPhotoLinks) {
+        if (!link.collection_id) continue
+
+        const rawPhoto = link.photos
+        const photo = Array.isArray(rawPhoto) ? rawPhoto[0] : rawPhoto
+        const photoId = link.photo_id || photo?.id
+
+        if (photoId) {
+          const idSet = directPhotoIdsMap.get(link.collection_id) || new Set<string>()
+          idSet.add(photoId)
+          directPhotoIdsMap.set(link.collection_id, idSet)
+
+          const imageUrl = photo?.image_url
+          if (imageUrl) {
+            const list = directPhotosMap.get(link.collection_id) || []
+            list.push({ url: imageUrl, order: link.order || 0 })
+            directPhotosMap.set(link.collection_id, list)
+          }
+        }
+      }
+
+      // 4. Build parent -> children map for hierarchy traversal
+      const childrenMap = new Map<string, string[]>()
+      for (const col of allCollectionsData || []) {
+        if (col.parent_id && col.parent_id.trim() !== '') {
+          const siblings = childrenMap.get(col.parent_id) || []
+          siblings.push(col.id)
+          childrenMap.set(col.parent_id, siblings)
+        }
+      }
+
+      // 5. Build recursive preview photos getter
+      const getPreviews = (rootId: string) => {
+        const allPreviewPhotos: { url: string; order: number }[] = [...(directPhotosMap.get(rootId) || [])]
+        const queue = [rootId]
+        while (queue.length > 0) {
+          const current = queue.shift()!
+          const children = childrenMap.get(current) || []
+          for (const childId of children) {
+            allPreviewPhotos.push(...(directPhotosMap.get(childId) || []))
+            queue.push(childId)
+          }
+        }
+        return allPreviewPhotos
+          .sort((a, b) => a.order - b.order)
+          .slice(0, 3)
+          .map(p => p.url)
+      }
+
+      // 6. Build recursive unique photo counter
+      const getCounts = (rootId: string) => {
+        const photoIds = new Set<string>(directPhotoIdsMap.get(rootId) || [])
+        let totalSubAlbums = 0
+        const queue = [rootId]
+        while (queue.length > 0) {
+          const current = queue.shift()!
+          const children = childrenMap.get(current) || []
+          for (const childId of children) {
+            const childPhotoIds = directPhotoIdsMap.get(childId) || []
+            childPhotoIds.forEach((id) => photoIds.add(id))
+            totalSubAlbums += 1
+            queue.push(childId)
+          }
+        }
+        const direct = (directPhotoIdsMap.get(rootId) || new Set()).size
+        const total = photoIds.size
+        const directSubCount = (childrenMap.get(rootId) || []).length
+        return { direct, total, subCount: directSubCount, totalSubAlbums }
+      }
+
+      const enhancedCollections: EnhancedCollection[] = (allCollectionsData || []).map(col => {
+        let finalPreviewPhotos = getPreviews(col.id)
+        if (col.cover_image_url) {
+          const filtered = finalPreviewPhotos.filter(url => url !== col.cover_image_url)
+          finalPreviewPhotos = [col.cover_image_url, ...filtered].slice(0, 3)
+        }
+        const { direct, total, subCount } = getCounts(col.id)
+        return {
+          ...col,
+          previewPhotos: finalPreviewPhotos,
+          directPhotoCount: direct,
+          totalPhotoCount: total,
+          subAlbumsCount: subCount
+        }
+      })
+
+      setAllCollections(enhancedCollections)
+    } catch (error: unknown) {
+      console.error('Error loading collections:', error)
+      setError('Failed to load collections')
+      toast.error('Failed to load collections')
     } finally {
       setLoadingStates(prev => ({ ...prev, loading: false }))
     }
   }, [supabase])
 
   useEffect(() => {
-    loadInitialData()
-  }, [loadInitialData])
+    loadAllCollections()
+  }, [loadAllCollections])
 
   // Keep selection aligned with currently visible items.
   useEffect(() => {
@@ -429,16 +877,6 @@ export default function CollectionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPath, allCollections, searchQuery])
 
-  // Subtle sticky-toolbar elevation after scroll for better visual separation.
-  useEffect(() => {
-    const onScroll = () => {
-      setIsToolbarElevated(window.scrollY > 12)
-    }
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
-
   // Performance: render photos incrementally for very large albums.
   useEffect(() => {
     setPhotoRenderCount(120)
@@ -449,34 +887,39 @@ export default function CollectionsPage() {
     [collectionPhotos, photoRenderCount]
   )
 
+  const handleSetAsCover = async (photo: Photo) => {
+    const currentCollectionId = currentPath.length > 0 ? currentPath[currentPath.length - 1] : null
+    if (!currentCollectionId) return
 
-  // Core functions
-  const loadAllCollections = async () => {
     try {
-      setLoadingStates(prev => ({ ...prev, loading: true }))
-
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('collections')
-        .select('*')
-        .order('created_at', { ascending: false })
+        .update({ cover_image_url: photo.image_url })
+        .eq('id', currentCollectionId)
 
       if (error) throw error
 
-      setAllCollections(data || [])
-    } catch (error: unknown) {
-      console.error('Error loading collections:', error)
-      toast.error('Failed to load collections')
-    } finally {
-      setLoadingStates(prev => ({ ...prev, loading: false }))
+      toast.success(`Set "${photo.title}" as album cover`)
+      await revalidatePublicPaths(['/', '/gallery', getCurrentCollectionPublicPath()].filter(Boolean) as string[])
+      await loadAllCollections()
+    } catch (err) {
+      console.error('Error setting cover image:', err)
+      toast.error('Failed to set album cover')
     }
   }
 
   const updateCurrentItems = useCallback(() => {
-    const currentFolderId = currentPath.length > 0 ? currentPath[currentPath.length - 1] : null
+    const isRoot = currentPath.length === 0
+    const currentFolderId = !isRoot ? currentPath[currentPath.length - 1] : null
 
     // Get subfolders
     const subfolders = allCollections
-      .filter(collection => collection.parent_id === currentFolderId)
+      .filter(collection => {
+        if (isRoot) {
+          return !collection.parent_id || collection.parent_id.trim() === ''
+        }
+        return collection.parent_id === currentFolderId
+      })
       .map(collection => ({
         id: collection.id,
         name: collection.title,
@@ -487,10 +930,6 @@ export default function CollectionsPage() {
 
     // Get photos in current folder (if it's a collection)
     const photos: FileExplorerItem[] = []
-    if (currentFolderId) {
-      // This would need to be implemented to fetch photos for the current collection
-      // For now, we'll leave it empty
-    }
 
     // Combine and filter by search
     let allItems = [...subfolders, ...photos]
@@ -513,20 +952,47 @@ export default function CollectionsPage() {
     }
 
     try {
-      // Get photos associated with this collection
-      const { data, error } = await supabase
-        .from('collection_photos')
-        .select(`
-          order,
-          photos (*)
-        `)
-        .eq('collection_id', currentCollectionId)
-        .order('order', { ascending: true })
+      // Get all photos associated with this collection in batches
+      const allLoadedPhotos: Photo[] = []
+      let from = 0
+      const PAGE_SIZE = 1000
+      let hasMore = true
 
-      if (error) throw error
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('collection_photos')
+          .select(`
+            order,
+            photos (*)
+          `)
+          .eq('collection_id', currentCollectionId)
+          .order('order', { ascending: true })
+          .range(from, from + PAGE_SIZE - 1)
 
-      const photos = (data as unknown as CollectionPhotoWithPhoto[] | null)?.map(cp => cp.photos).filter(Boolean) || []
-      setCollectionPhotos(photos)
+        if (error) throw error
+
+        if (data && data.length > 0) {
+          const batchPhotos: Photo[] = []
+          for (const row of data as unknown as { order: number; photos: Photo | Photo[] | null }[]) {
+            if (!row.photos) continue
+            const photo = Array.isArray(row.photos) ? row.photos[0] : row.photos
+            if (photo && photo.id) {
+              batchPhotos.push(photo)
+            }
+          }
+          allLoadedPhotos.push(...batchPhotos)
+
+          if (data.length < PAGE_SIZE) {
+            hasMore = false
+          } else {
+            from += PAGE_SIZE
+          }
+        } else {
+          hasMore = false
+        }
+      }
+
+      setCollectionPhotos(allLoadedPhotos)
     } catch (error: unknown) {
       console.error('Error loading collection photos:', error)
       toast.error('Failed to load photos')
@@ -698,6 +1164,31 @@ export default function CollectionsPage() {
     }
   }
 
+  const handleDeleteItem = (itemId: string) => {
+    const col = allCollections.find(c => c.id === itemId)
+    const title = col?.title || 'this album'
+    setConfirmAction({
+      title: 'Delete Album',
+      description: `Are you sure you want to delete "${title}"? Any nested sub-albums will be moved to the root level.`,
+      confirmText: 'Delete Album',
+      action: async () => {
+        await deleteItems([itemId])
+      }
+    })
+  }
+
+  const handleDeleteSelected = () => {
+    if (selectedItems.size === 0) return
+    setConfirmAction({
+      title: 'Delete Selected Albums',
+      description: `Are you sure you want to delete ${selectedItems.size} album${selectedItems.size > 1 ? 's' : ''}?`,
+      confirmText: 'Delete Albums',
+      action: async () => {
+        await deleteItems(Array.from(selectedItems))
+      }
+    })
+  }
+
   const bulkMoveItems = async () => {
     if (selectedItems.size === 0 || !bulkMoveTarget) return
 
@@ -779,161 +1270,182 @@ export default function CollectionsPage() {
       await revalidatePublicPaths(
         ['/', '/gallery', getCurrentCollectionPublicPath()].filter((path): path is string => Boolean(path))
       )
-      await loadCollectionPhotos()
       setShowPhotoUpload(false)
+      await loadCollectionPhotos()
+      await loadAllCollections()
     } catch (error: unknown) {
       console.error('Error adding photos to collection:', error)
       toast.error('Failed to add photos to collection')
     }
   }
 
-  const removePhotoFromCollection = async (photoId: string) => {
-    if (!confirm('Remove this photo from the collection?')) return
+  const removePhotoFromCollection = (photoId: string) => {
+    setConfirmAction({
+      title: 'Remove Photo from Album',
+      description: 'Are you sure you want to remove this photo from this collection? The original photo will remain in your global media library.',
+      confirmText: 'Remove Photo',
+      action: async () => {
+        const { error } = await supabase
+          .from('collection_photos')
+          .delete()
+          .eq('photo_id', photoId)
+          .eq('collection_id', currentPath[currentPath.length - 1])
 
-    try {
-      const { error } = await supabase
-        .from('collection_photos')
-        .delete()
-        .eq('photo_id', photoId)
-        .eq('collection_id', currentPath[currentPath.length - 1])
+        if (error) throw error
 
-      if (error) throw error
-
-      toast.success('Photo removed from collection')
-      await revalidatePublicPaths(
-        ['/', '/gallery', getCurrentCollectionPublicPath()].filter((path): path is string => Boolean(path))
-      )
-      await loadCollectionPhotos()
-      setSelectedPhotos((prev) => {
-        if (!prev.has(photoId)) return prev
-        const next = new Set(prev)
-        next.delete(photoId)
-        return next
-      })
-    } catch (error: unknown) {
-      console.error('Error removing photo:', error)
-      toast.error('Failed to remove photo')
-    }
-  }
-
-  const permanentlyDeletePhoto = async (photo: Photo) => {
-    if (!confirm('Permanently delete this photo from Cloudinary and database?')) return
-
-    try {
-      setLoadingStates(prev => ({ ...prev, deleting: true }))
-
-      const cloudinaryResponse = await fetch('/api/cloudinary/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ publicIds: [photo.image_id] }),
-      })
-
-      if (!cloudinaryResponse.ok) {
-        throw new Error('Failed to delete image from Cloudinary')
+        toast.success('Photo removed from collection')
+        await revalidatePublicPaths(
+          ['/', '/gallery', getCurrentCollectionPublicPath()].filter((path): path is string => Boolean(path))
+        )
+        setSelectedPhotos((prev) => {
+          if (!prev.has(photoId)) return prev
+          const next = new Set(prev)
+          next.delete(photoId)
+          return next
+        })
+        await loadCollectionPhotos()
+        await loadAllCollections()
       }
-
-      const { error } = await supabase
-        .from('photos')
-        .delete()
-        .eq('id', photo.id)
-
-      if (error) throw error
-
-      toast.success('Photo permanently deleted')
-      await revalidatePublicPaths(
-        ['/', '/gallery', getCurrentCollectionPublicPath()].filter((path): path is string => Boolean(path))
-      )
-      await loadCollectionPhotos()
-    } catch (error: unknown) {
-      console.error('Permanent photo delete error:', error)
-      toast.error('Failed to permanently delete photo')
-    } finally {
-      setLoadingStates(prev => ({ ...prev, deleting: false }))
-    }
+    })
   }
 
-  const removeSelectedPhotosFromCollection = async () => {
+  const permanentlyDeletePhoto = (photo: Photo) => {
+    setConfirmAction({
+      title: 'Delete Photo Permanently',
+      description: `Permanently delete "${photo.title}"? This photo will be removed from Cloudinary and all albums. This action cannot be undone.`,
+      confirmText: 'Delete Permanently',
+      action: async () => {
+        try {
+          setLoadingStates(prev => ({ ...prev, deleting: true }))
+
+          const cloudinaryResponse = await fetch('/api/cloudinary/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ publicIds: [photo.image_id] }),
+          })
+
+          if (!cloudinaryResponse.ok) {
+            throw new Error('Failed to delete image from Cloudinary')
+          }
+
+          const { error } = await supabase
+            .from('photos')
+            .delete()
+            .eq('id', photo.id)
+
+          if (error) throw error
+
+          toast.success('Photo permanently deleted')
+          await revalidatePublicPaths(
+            ['/', '/gallery', getCurrentCollectionPublicPath()].filter((path): path is string => Boolean(path))
+          )
+          await loadCollectionPhotos()
+          await loadAllCollections()
+        } catch (error: unknown) {
+          console.error('Permanent photo delete error:', error)
+          toast.error('Failed to permanently delete photo')
+        } finally {
+          setLoadingStates(prev => ({ ...prev, deleting: false }))
+        }
+      }
+    })
+  }
+
+  const removeSelectedPhotosFromCollection = () => {
     if (selectedPhotos.size === 0 || currentPath.length === 0) return
-    if (!confirm(`Remove ${selectedPhotos.size} photo${selectedPhotos.size > 1 ? 's' : ''} from this collection?`)) return
 
-    try {
-      setLoadingStates(prev => ({ ...prev, deleting: true }))
+    setConfirmAction({
+      title: 'Remove Photos from Album',
+      description: `Are you sure you want to remove ${selectedPhotos.size} photo${selectedPhotos.size > 1 ? 's' : ''} from this collection?`,
+      confirmText: 'Remove Photos',
+      action: async () => {
+        try {
+          setLoadingStates(prev => ({ ...prev, deleting: true }))
 
-      const { error } = await supabase
-        .from('collection_photos')
-        .delete()
-        .eq('collection_id', currentPath[currentPath.length - 1])
-        .in('photo_id', Array.from(selectedPhotos))
+          const { error } = await supabase
+            .from('collection_photos')
+            .delete()
+            .eq('collection_id', currentPath[currentPath.length - 1])
+            .in('photo_id', Array.from(selectedPhotos))
 
-      if (error) throw error
+          if (error) throw error
 
-      toast.success(`${selectedPhotos.size} photo${selectedPhotos.size > 1 ? 's' : ''} removed from collection`)
-      await revalidatePublicPaths(
-        ['/', '/gallery', getCurrentCollectionPublicPath()].filter((path): path is string => Boolean(path))
-      )
-      setSelectedPhotos(new Set())
-      await loadCollectionPhotos()
-    } catch (error: unknown) {
-      console.error('Error removing selected photos:', error)
-      toast.error('Failed to remove selected photos')
-    } finally {
-      setLoadingStates(prev => ({ ...prev, deleting: false }))
-    }
+          toast.success(`${selectedPhotos.size} photo${selectedPhotos.size > 1 ? 's' : ''} removed from collection`)
+          await revalidatePublicPaths(
+            ['/', '/gallery', getCurrentCollectionPublicPath()].filter((path): path is string => Boolean(path))
+          )
+          setSelectedPhotos(new Set())
+          await loadCollectionPhotos()
+          await loadAllCollections()
+        } catch (error: unknown) {
+          console.error('Error removing selected photos:', error)
+          toast.error('Failed to remove selected photos')
+        } finally {
+          setLoadingStates(prev => ({ ...prev, deleting: false }))
+        }
+      }
+    })
   }
 
-  const permanentlyDeleteSelectedPhotos = async () => {
+  const permanentlyDeleteSelectedPhotos = () => {
     if (selectedPhotos.size === 0) return
 
     const selectedPhotoRows = collectionPhotos.filter((photo) => selectedPhotos.has(photo.id))
     if (selectedPhotoRows.length === 0) return
 
-    if (!confirm(`Permanently delete ${selectedPhotoRows.length} photo${selectedPhotoRows.length > 1 ? 's' : ''} from Cloudinary and database?`)) return
+    setConfirmAction({
+      title: 'Delete Photos Permanently',
+      description: `Permanently delete ${selectedPhotoRows.length} photo${selectedPhotoRows.length > 1 ? 's' : ''}? This will delete them from Cloudinary and all albums. This action cannot be undone.`,
+      confirmText: 'Delete Permanently',
+      action: async () => {
+        try {
+          setLoadingStates(prev => ({ ...prev, deleting: true }))
+          setPhotoDeleteProgress({ current: 0, total: selectedPhotoRows.length })
 
-    try {
-      setLoadingStates(prev => ({ ...prev, deleting: true }))
-      setPhotoDeleteProgress({ current: 0, total: selectedPhotoRows.length })
+          const CHUNK_SIZE = 25
+          for (let start = 0; start < selectedPhotoRows.length; start += CHUNK_SIZE) {
+            const chunk = selectedPhotoRows.slice(start, start + CHUNK_SIZE)
+            const publicIds = chunk
+              .map((photo) => photo.image_id)
+              .filter((id): id is string => Boolean(id))
 
-      const CHUNK_SIZE = 25
-      for (let start = 0; start < selectedPhotoRows.length; start += CHUNK_SIZE) {
-        const chunk = selectedPhotoRows.slice(start, start + CHUNK_SIZE)
-        const publicIds = chunk
-          .map((photo) => photo.image_id)
-          .filter((id): id is string => Boolean(id))
+            const cloudinaryResponse = await fetch('/api/cloudinary/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ publicIds }),
+            })
 
-        const cloudinaryResponse = await fetch('/api/cloudinary/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ publicIds }),
-        })
+            if (!cloudinaryResponse.ok) {
+              throw new Error('Failed to delete one or more images from Cloudinary')
+            }
 
-        if (!cloudinaryResponse.ok) {
-          throw new Error('Failed to delete one or more images from Cloudinary')
+            const photoIds = chunk.map((photo) => photo.id)
+            const { error } = await supabase
+              .from('photos')
+              .delete()
+              .in('id', photoIds)
+
+            if (error) throw error
+
+            setPhotoDeleteProgress({ current: Math.min(start + chunk.length, selectedPhotoRows.length), total: selectedPhotoRows.length })
+          }
+
+          toast.success(`${selectedPhotoRows.length} photo${selectedPhotoRows.length > 1 ? 's' : ''} permanently deleted`)
+          await revalidatePublicPaths(
+            ['/', '/gallery', getCurrentCollectionPublicPath()].filter((path): path is string => Boolean(path))
+          )
+          setSelectedPhotos(new Set())
+          await loadCollectionPhotos()
+          await loadAllCollections()
+        } catch (error: unknown) {
+          console.error('Permanent selected photo delete error:', error)
+          toast.error('Failed to permanently delete selected photos')
+        } finally {
+          setLoadingStates(prev => ({ ...prev, deleting: false }))
+          setPhotoDeleteProgress(null)
         }
-
-        const photoIds = chunk.map((photo) => photo.id)
-        const { error } = await supabase
-          .from('photos')
-          .delete()
-          .in('id', photoIds)
-
-        if (error) throw error
-
-        setPhotoDeleteProgress({ current: Math.min(start + chunk.length, selectedPhotoRows.length), total: selectedPhotoRows.length })
       }
-
-      toast.success(`${selectedPhotoRows.length} photo${selectedPhotoRows.length > 1 ? 's' : ''} permanently deleted`)
-      await revalidatePublicPaths(
-        ['/', '/gallery', getCurrentCollectionPublicPath()].filter((path): path is string => Boolean(path))
-      )
-      setSelectedPhotos(new Set())
-      await loadCollectionPhotos()
-    } catch (error: unknown) {
-      console.error('Permanent selected photo delete error:', error)
-      toast.error('Failed to permanently delete selected photos')
-    } finally {
-      setLoadingStates(prev => ({ ...prev, deleting: false }))
-      setPhotoDeleteProgress(null)
-    }
+    })
   }
 
   const toggleSelectAllPhotos = () => {
@@ -1046,10 +1558,10 @@ export default function CollectionsPage() {
 
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-b from-background to-muted/20">
+    <div className="space-y-6">
       {/* Error Display */}
       {error && (
-        <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 m-4 shadow-sm">
+        <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 shadow-sm">
           <div className="flex items-center gap-2 text-destructive">
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
@@ -1060,246 +1572,374 @@ export default function CollectionsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={loadInitialData}
+            onClick={loadAllCollections}
             className="mt-2"
           >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
+            <RefreshCw className="w-4 h-4 mr-2" />
             Retry
           </Button>
         </div>
       )}
 
-      {/* Toolbar */}
-      <div className={`sticky top-0 z-30 m-4 mb-2 rounded-xl border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 p-3 sm:p-4 transition-shadow duration-200 ${
-        isToolbarElevated ? 'shadow-lg' : 'shadow-sm'
-      }`}>
-        <div className="mb-3">
-          <h2 className="text-lg sm:text-xl font-semibold tracking-tight">Collections Manager</h2>
-          <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-            Organize albums, manage cover images, and maintain collection structure.
+      {/* Top Page Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+            {currentPath.length > 0 ? (currentPathNames[currentPathNames.length - 1] || 'Album') : 'Albums & Collections'}
+          </h1>
+          <p className="text-xs sm:text-sm text-zinc-400 mt-1">
+            {currentPath.length > 0
+              ? `Manage photos, sub-albums, and album settings`
+              : `Organize your photo albums, manage cover images, and homepage featured albums`}
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-        {/* Top row on mobile: Navigation + Breadcrumbs */}
-        <div className="flex items-center gap-2 w-full sm:w-auto sm:flex-1 min-w-0">
-          {/* Navigation buttons */}
-          <div className="flex items-center gap-1 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={goUp}
-              disabled={currentPath.length === 0}
-              className="h-9 w-9 p-0"
-            >
-              <ArrowLeft className="w-4 h-4 shrink-0" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigateToPath(0)}
-              className="h-9 w-9 p-0"
-            >
-              <Home className="w-4 h-4 shrink-0" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={loadAllCollections}
-              disabled={loadingStates.loading}
-              className="h-9 w-9 p-0"
-            >
-              <RefreshCw className={`w-4 h-4 shrink-0 ${loadingStates.loading ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
 
-          <Separator orientation="vertical" className="h-6 hidden sm:block" />
-
-          {/* Breadcrumbs */}
-          <div className="flex-1 min-w-0">
-            <Breadcrumb>
-              <BreadcrumbList className="flex-wrap">
-                {currentPathNames.map((name: string, index: number) => (
-                  <div key={index} className="flex items-center">
-                    {index > 0 && <BreadcrumbSeparator />}
-                    <BreadcrumbItem>
-                      {index === currentPathNames.length - 1 ? (
-                        <BreadcrumbPage className="text-sm">{name}</BreadcrumbPage>
-                      ) : (
-                        <BreadcrumbLink
-                          className="cursor-pointer text-sm"
-                          onClick={() => navigateToPath(index)}
-                        >
-                          {name}
-                        </BreadcrumbLink>
-                      )}
-                    </BreadcrumbItem>
-                  </div>
-                ))}
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-        </div>
-
-        {/* Bottom row on mobile: Search, View mode, Select All, Actions */}
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
-          {/* Search */}
-          <div className="relative flex-1 min-w-[220px] sm:flex-none">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search files and folders..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 w-full sm:w-48 md:w-64"
-            />
-          </div>
-
-          <Separator orientation="vertical" className="h-6 hidden sm:block" />
-
-          {/* View mode toggle */}
-          <div className="flex items-center gap-1">
-            <Button
-              variant={viewMode === 'grid' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setViewMode('grid')}
-              className="h-9 w-9 p-0"
-            >
-              <Grid3X3 className="w-4 h-4 shrink-0" />
-            </Button>
-            <Button
-              variant={viewMode === 'list' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setViewMode('list')}
-              className="h-9 w-9 p-0"
-            >
-              <List className="w-4 h-4 shrink-0" />
-            </Button>
-          </div>
-
-          <Separator orientation="vertical" className="h-6 hidden sm:block" />
-
-          {/* Select All */}
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="select-all"
-              checked={
-                selectedItems.size > 0 &&
-                selectedItems.size === currentItems.filter((item) => item.type === 'folder').length
-              }
-              onChange={toggleSelectAll}
-              className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
-            />
-            <label htmlFor="select-all" className="text-sm cursor-pointer hidden sm:inline">
-              Select All
-            </label>
-          </div>
-
-          <Separator orientation="vertical" className="h-6 hidden sm:block" />
-
-          {/* Actions */}
-          <div className="flex gap-1 sm:gap-2 ml-auto sm:ml-0">
-            <Button onClick={() => setShowCreateFolder(true)} size="sm" className="h-9 text-xs sm:text-sm font-medium">
-              <Plus className="w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">New Folder</span>
-            </Button>
-            {currentPath.length > 0 && (
-              <Button onClick={() => setShowPhotoUpload(true)} variant="outline" size="sm" className="h-9 text-xs sm:text-sm font-medium">
-                <FileImage className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Add Photos</span>
+        {/* Primary Action Buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {currentPath.length === 0 ? (
+            <>
+              <Button
+                onClick={() => setShowFeaturedOrder(true)}
+                size="sm"
+                variant="outline"
+                className="rounded-xl border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 hover:text-amber-200 h-9 text-xs sm:text-sm"
+              >
+                <Star className="w-3.5 h-3.5 mr-1.5 fill-amber-300" />
+                Featured Order
               </Button>
-            )}
-          </div>
-        </div>
+              <Button
+                onClick={() => setShowCreateFolder(true)}
+                size="sm"
+                className="rounded-xl bg-white text-black hover:bg-zinc-200 font-semibold h-9 text-xs sm:text-sm px-4"
+              >
+                <Plus className="w-4 h-4 mr-1.5" />
+                New Album
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                onClick={goUp}
+                size="sm"
+                variant="outline"
+                className="rounded-xl border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 text-zinc-300 h-9 text-xs sm:text-sm"
+              >
+                <ArrowLeft className="w-4 h-4 mr-1.5" />
+                Back
+              </Button>
+              <Button
+                onClick={() => setShowPhotoUpload(true)}
+                size="sm"
+                className="rounded-xl bg-white text-black hover:bg-zinc-200 font-semibold h-9 text-xs sm:text-sm px-4"
+              >
+                <Plus className="w-4 h-4 mr-1.5" />
+                Upload Photos
+              </Button>
+              <Button
+                onClick={() => setShowCreateFolder(true)}
+                size="sm"
+                variant="outline"
+                className="rounded-xl border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 hover:text-white h-9 text-xs sm:text-sm"
+              >
+                <Folder className="w-3.5 h-3.5 mr-1.5 text-zinc-400" />
+                New Sub-Album
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Bulk Actions Toolbar */}
+      {/* Navigation & Search Bar */}
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-3 sm:p-4 backdrop-blur-md">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          {/* Left: Navigation & Breadcrumbs */}
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="flex items-center gap-1 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goUp}
+                disabled={currentPath.length === 0}
+                className="h-9 w-9 p-0 rounded-xl border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 hover:text-white disabled:opacity-30"
+                title="Go back up"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigateToPath(0)}
+                className={`h-9 w-9 p-0 rounded-xl border-zinc-800 ${currentPath.length === 0 ? 'bg-zinc-800 text-white' : 'bg-zinc-900/60 text-zinc-400 hover:bg-zinc-800 hover:text-white'}`}
+                title="Root Albums"
+              >
+                <Home className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadAllCollections}
+                disabled={loadingStates.loading}
+                className="h-9 w-9 p-0 rounded-xl border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 text-zinc-400 hover:text-white"
+                title="Refresh albums"
+              >
+                <RefreshCw className={`w-4 h-4 ${loadingStates.loading ? 'animate-spin text-white' : ''}`} />
+              </Button>
+            </div>
+
+            <Separator orientation="vertical" className="h-6 bg-zinc-800 hidden sm:block" />
+
+            {/* Breadcrumb Path */}
+            <div className="flex-1 min-w-0 overflow-x-auto scrollbar-none py-1">
+              <Breadcrumb>
+                <BreadcrumbList className="flex-nowrap text-xs sm:text-sm">
+                  {currentPathNames.map((name: string, index: number) => {
+                    const isLast = index === currentPathNames.length - 1
+                    return (
+                      <div key={index} className="flex items-center shrink-0">
+                        {index > 0 && <BreadcrumbSeparator className="text-zinc-600 mx-1.5" />}
+                        <BreadcrumbItem>
+                          {isLast ? (
+                            <BreadcrumbPage className="font-semibold text-white truncate max-w-[160px] sm:max-w-[240px]">
+                              {name}
+                            </BreadcrumbPage>
+                          ) : (
+                            <BreadcrumbLink
+                              className="cursor-pointer text-zinc-400 hover:text-white transition-colors truncate max-w-[120px] sm:max-w-[180px]"
+                              onClick={() => navigateToPath(index)}
+                            >
+                              {name}
+                            </BreadcrumbLink>
+                          )}
+                        </BreadcrumbItem>
+                      </div>
+                    )
+                  })}
+                </BreadcrumbList>
+              </Breadcrumb>
+            </div>
+          </div>
+
+          {/* Right: Search & View Toggle */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="relative w-full sm:w-56 md:w-64">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-zinc-400" />
+              <Input
+                placeholder="Filter albums & photos..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-8 h-9 text-xs sm:text-sm rounded-xl border-zinc-800 bg-zinc-900/80 text-white placeholder:text-zinc-500 focus:border-zinc-600"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center rounded-xl border border-zinc-800 bg-zinc-900/80 p-0.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewMode('grid')}
+                className={`h-8 w-8 p-0 rounded-lg ${viewMode === 'grid' ? 'bg-zinc-800 text-white shadow' : 'text-zinc-400 hover:text-white hover:bg-transparent'}`}
+                title="Grid view"
+              >
+                <Grid3X3 className="w-3.5 h-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className={`h-8 w-8 p-0 rounded-lg ${viewMode === 'list' ? 'bg-zinc-800 text-white shadow' : 'text-zinc-400 hover:text-white hover:bg-transparent'}`}
+                title="List view"
+              >
+                <List className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bulk Album Selection Toolbar */}
       {selectedItems.size > 0 && (
-        <div className="mx-4 mb-2 flex flex-col sm:flex-row items-start sm:items-center gap-2 p-3 rounded-xl border bg-muted/50 shadow-sm">
-          <span className="text-sm font-medium">
-            {selectedItems.size} item{selectedItems.size > 1 ? 's' : ''} selected
-          </span>
-          <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 rounded-2xl border border-zinc-700 bg-zinc-900/90 shadow-xl backdrop-blur-md">
+          <div className="flex items-center gap-2 text-sm font-medium text-white">
+            <span className="w-6 h-6 rounded-full bg-white text-black text-xs font-bold flex items-center justify-center">
+              {selectedItems.size}
+            </span>
+            <span>{selectedItems.size === 1 ? 'Album' : 'Albums'} selected</span>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowBulkMoveDialog(true)}
-              className="flex-1 sm:flex-none"
+              className="flex-1 sm:flex-none rounded-xl border-zinc-700 hover:bg-zinc-800 text-xs h-8"
             >
-              Move To
+              <MoveRight className="w-3.5 h-3.5 mr-1.5" />
+              Move To...
             </Button>
             <Button
               variant="destructive"
               size="sm"
-              onClick={() => {
-                if (confirm(`Delete ${selectedItems.size} collection${selectedItems.size > 1 ? 's' : ''}?`)) {
-                  deleteItems(Array.from(selectedItems))
-                }
-              }}
-              className="flex-1 sm:flex-none"
+              onClick={handleDeleteSelected}
+              className="flex-1 sm:flex-none rounded-xl text-xs h-8"
             >
-              Delete
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+              Delete ({selectedItems.size})
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedItems(new Set())}
+              className="rounded-xl text-xs text-zinc-400 hover:text-white h-8"
+            >
+              Clear Selection
             </Button>
           </div>
-          <div className="flex-1 hidden sm:block" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSelectedItems(new Set())}
-            className="w-full sm:w-auto"
-          >
-            Clear Selection
-          </Button>
-        </div>
-      )}
-
-      {(searchQuery.trim().length > 0 || selectedItems.size > 0) && (
-        <div className="mx-4 mb-2 p-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-sm">
-          Drag-and-drop is disabled while searching or using batch selection.
         </div>
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* File Explorer Content */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {loadingStates.loading ? (
-            <div className="flex-1 p-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
-                {Array.from({ length: 10 }).map((_, idx) => (
-                  <div key={`skeleton-${idx}`} className="rounded-xl border bg-background overflow-hidden animate-pulse">
-                    <div className="aspect-[4/3] bg-muted" />
-                    <div className="p-3 space-y-2">
-                      <div className="h-4 bg-muted rounded w-3/4 mx-auto" />
-                      <div className="h-3 bg-muted/70 rounded w-1/2 mx-auto" />
+      <div>
+        {/* If inside an album: Render Album Hero Header */}
+        {currentPath.length > 0 && (() => {
+          const currentFolderId = currentPath[currentPath.length - 1]
+          const currentCollection = allCollections.find(c => c.id === currentFolderId)
+          const subfolders = currentItems.filter(item => item.type === 'folder')
+
+          return (
+            <div className="mb-6 rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4 sm:p-5 backdrop-blur-md">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-4 min-w-0">
+                  {/* Cover thumbnail or Folder icon */}
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shrink-0 relative shadow-md">
+                    {currentCollection?.cover_image_url ? (
+                      <Image src={currentCollection.cover_image_url} alt={currentCollection.title} fill className="object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-zinc-600 bg-gradient-to-b from-zinc-900 to-zinc-950">
+                        <Folder className="w-7 h-7 text-zinc-500" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate">
+                        {currentCollection?.title || 'Album'}
+                      </h2>
+                      {currentCollection?.featured && (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1 shadow-sm">
+                          <Star className="w-3 h-3 fill-amber-300" /> Featured on Home
+                        </span>
+                      )}
+                    </div>
+                    {currentCollection?.description && (
+                      <p className="text-xs sm:text-sm text-zinc-400 mt-1 line-clamp-1">
+                        {currentCollection.description}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2.5 text-xs text-zinc-400 mt-1.5 flex-wrap">
+                      <span className="text-white font-medium">{collectionPhotos.length} {collectionPhotos.length === 1 ? 'photo' : 'photos'}</span>
+                      {subfolders.length > 0 && (
+                        <>
+                          <span className="text-zinc-600">•</span>
+                          <span>{subfolders.length} {subfolders.length === 1 ? 'sub-album' : 'sub-albums'}</span>
+                        </>
+                      )}
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          ) : currentItems.length === 0 ? (
-            <div className="flex-1 p-4">
-              <div className="h-full rounded-xl border border-dashed bg-background/70 flex flex-col items-center justify-center text-center p-8">
-                <Folder className="w-16 h-16 text-muted-foreground/50 mb-4" />
-                <h3 className="text-lg font-semibold tracking-tight mb-2">
-                {searchQuery ? 'No items found' : 'This folder is empty'}
-                </h3>
-                <p className="text-muted-foreground mb-4 max-w-md">
-                {searchQuery ? 'Try a different search term' : 'Create a new folder or upload some files'}
-                </p>
-                {!searchQuery && (
-                  <Button onClick={() => setShowCreateFolder(true)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    New Folder
+                </div>
+
+                {/* Quick Actions */}
+                <div className="flex items-center gap-2 flex-wrap shrink-0">
+                  <Button
+                    onClick={() => {
+                      if (currentCollection) {
+                        setEditingItem({
+                          id: currentCollection.id,
+                          name: currentCollection.title,
+                          type: 'folder',
+                          data: currentCollection
+                        })
+                        setEditFormData({
+                          title: currentCollection.title,
+                          description: currentCollection.description || '',
+                          cover_image_url: currentCollection.cover_image_url || '',
+                          parent_id: currentCollection.parent_id || '',
+                          featured: currentCollection.featured || false
+                        })
+                        setShowEditDialog(true)
+                      }
+                    }}
+                    size="sm"
+                    variant="outline"
+                    className="rounded-xl border-zinc-800 hover:bg-zinc-900 h-9 text-xs sm:text-sm"
+                  >
+                    <Settings className="w-4 h-4 mr-1.5 text-zinc-400" />
+                    Album Settings
                   </Button>
-                )}
+                </div>
               </div>
             </div>
-          ) : (
-            <ScrollArea className="flex-1">
-              <div className="p-4">
+          )
+        })()}
+
+        {/* Loading State */}
+        {loadingStates.loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
+            {Array.from({ length: 10 }).map((_, idx) => (
+              <div key={`skeleton-${idx}`} className="rounded-2xl border border-zinc-800 bg-zinc-900/40 overflow-hidden animate-pulse">
+                <div className="aspect-[4/3] bg-zinc-800/60" />
+                <div className="p-3.5 space-y-2 bg-zinc-950/80">
+                  <div className="h-4 bg-zinc-800 rounded w-3/4" />
+                  <div className="h-3 bg-zinc-800/60 rounded w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
+            {/* Sub-Albums Section (or Root Albums when at root) */}
+            {currentItems.length > 0 && (
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+                      <Folder className="w-4 h-4 text-zinc-500" />
+                      {currentPath.length > 0
+                        ? `Sub-Albums (${currentItems.filter(i => i.type === 'folder').length})`
+                        : `Albums & Collections (${currentItems.filter(i => i.type === 'folder').length})`}
+                    </h3>
+                    {currentItems.filter(i => i.type === 'folder').length > 1 && (
+                      <Button
+                        onClick={toggleSelectAll}
+                        size="sm"
+                        variant="outline"
+                        className="rounded-xl border-zinc-800 hover:bg-zinc-900 h-7 text-xs px-2.5 text-zinc-300"
+                      >
+                        {selectedItems.size > 0 && selectedItems.size === currentItems.filter(i => i.type === 'folder').length
+                          ? 'Deselect All'
+                          : 'Select All'}
+                      </Button>
+                    )}
+                  </div>
+                  {currentPath.length > 0 && (
+                    <Button
+                      onClick={() => setShowCreateFolder(true)}
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-zinc-400 hover:text-white h-7"
+                    >
+                      <Plus className="w-3.5 h-3.5 mr-1" />
+                      New Sub-Album
+                    </Button>
+                  )}
+                </div>
+
                 {viewMode === 'grid' ? (
                   <DndContext
                     sensors={sensors}
@@ -1332,7 +1972,7 @@ export default function CollectionsPage() {
                               })
                               setShowEditDialog(true)
                             }}
-                            onDelete={(itemId) => deleteItems([itemId])}
+                            onDelete={(itemId) => handleDeleteItem(itemId)}
                             onRename={(item) => {
                               setRenamingItem(item)
                               setRenameValue(item.name)
@@ -1349,13 +1989,13 @@ export default function CollectionsPage() {
                     </SortableContext>
                   </DndContext>
                 ) : (
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     {currentItems.map((item) => (
                       <ContextMenu key={item.id}>
-                        <ContextMenuTrigger>
+                        <ContextMenuTrigger asChild>
                           <div
-                            className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-colors duration-150 hover:bg-accent ${
-                              selectedItems.has(item.id) ? 'bg-accent' : ''
+                            className={`flex items-center gap-3 p-3 rounded-2xl border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 cursor-pointer transition-colors duration-150 ${
+                              selectedItems.has(item.id) ? 'bg-zinc-800 border-white/40 shadow' : ''
                             }`}
                             onClick={() => {
                               if (item.type === 'folder') {
@@ -1365,7 +2005,7 @@ export default function CollectionsPage() {
                           >
                             {item.type === 'folder' ? (
                               item.data && 'cover_image_url' in item.data && item.data.cover_image_url ? (
-                                <div className="w-8 h-8 flex-shrink-0 relative overflow-hidden rounded">
+                                <div className="w-10 h-10 flex-shrink-0 relative overflow-hidden rounded-xl border border-zinc-800">
                                   <Image
                                     src={item.data.cover_image_url}
                                     alt={item.name}
@@ -1374,18 +2014,26 @@ export default function CollectionsPage() {
                                   />
                                 </div>
                               ) : (
-                                <Folder className="w-8 h-8 text-blue-500 flex-shrink-0" />
+                                <div className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center text-zinc-500">
+                                  <Folder className="w-5 h-5" />
+                                </div>
                               )
                             ) : (
-                              <FileImage className="w-8 h-8 text-gray-500 flex-shrink-0" />
+                              <FileImage className="w-10 h-10 text-zinc-500 flex-shrink-0" />
                             )}
-                            <span className="flex-1 truncate">{item.name}</span>
-                            <span className="text-sm text-muted-foreground">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-white truncate">{item.name}</p>
+                              <p className="text-xs text-zinc-400">
+                                {(item.data as EnhancedCollection)?.totalPhotoCount ?? 0} photos
+                              </p>
+                            </div>
+                            <span className="text-xs text-zinc-500 mr-2">
                               {item.modified}
                             </span>
+                            <ChevronRight className="w-4 h-4 text-zinc-600" />
                           </div>
                         </ContextMenuTrigger>
-                        <ContextMenuContent>
+                        <ContextMenuContent className="border-zinc-800 bg-zinc-950 text-white">
                           <ContextMenuItem onClick={() => {
                             setEditingItem(item)
                             setEditFormData({
@@ -1398,7 +2046,7 @@ export default function CollectionsPage() {
                             setShowEditDialog(true)
                           }}>
                             <Settings className="w-4 h-4 mr-2" />
-                            Edit
+                            Edit Album
                           </ContextMenuItem>
                           <ContextMenuItem onClick={() => {
                             setRenamingItem(item)
@@ -1412,13 +2060,13 @@ export default function CollectionsPage() {
                             setPropertiesItem(item)
                             setShowProperties(true)
                           }}>
-                            <Settings className="w-4 h-4 mr-2" />
+                            <Layers className="w-4 h-4 mr-2" />
                             Properties
                           </ContextMenuItem>
-                          <ContextMenuSeparator />
+                          <ContextMenuSeparator className="bg-zinc-800" />
                           <ContextMenuItem
-                            onClick={() => deleteItems([item.id])}
-                            className="text-destructive"
+                            onClick={() => handleDeleteItem(item.id)}
+                            className="text-red-400 focus:text-red-300 focus:bg-red-950/50"
                           >
                             <Trash2 className="w-4 h-4 mr-2" />
                             Delete
@@ -1429,241 +2077,400 @@ export default function CollectionsPage() {
                   </div>
                 )}
               </div>
-            </ScrollArea>
-          )}
-        </div>
+            )}
 
-        {/* Photos Section - Show when viewing a collection */}
-        {currentPath.length > 0 && (
-          <div className="mx-4 mb-4 rounded-xl border bg-background shadow-sm">
-            <div className="p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <h3 className="text-lg font-semibold tracking-tight">Photos in Collection</h3>
-                <div className="flex flex-wrap items-center gap-2">
-                  {collectionPhotos.length > 0 && (
-                    <>
-                      <Button onClick={toggleSelectAllPhotos} size="sm" variant="outline" className="h-9">
-                        {selectedPhotos.size === collectionPhotos.length ? 'Clear All' : 'Select All'}
-                      </Button>
-                      {selectedPhotos.size > 0 && (
-                        <>
-                          <Button
-                            onClick={removeSelectedPhotosFromCollection}
-                            size="sm"
-                            variant="outline"
-                            disabled={loadingStates.deleting}
-                            className="h-9"
-                          >
-                            {loadingStates.deleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                            Remove Selected ({selectedPhotos.size})
-                          </Button>
-                          <Button
-                            onClick={permanentlyDeleteSelectedPhotos}
-                            size="sm"
-                            variant="destructive"
-                            disabled={loadingStates.deleting}
-                            className="h-9"
-                          >
-                            {loadingStates.deleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                            {photoDeleteProgress
-                              ? `Deleting ${photoDeleteProgress.current}/${photoDeleteProgress.total}`
-                              : 'Delete Selected Permanently'}
-                          </Button>
-                        </>
-                      )}
-                    </>
-                  )}
-                  <Button onClick={() => setShowPhotoUpload(true)} size="sm" className="h-9">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Photos
-                  </Button>
-                </div>
-              </div>
-
-              {collectionPhotos.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground border border-dashed rounded-xl bg-muted/20">
-                  <FileImage className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                  <p className="text-sm">No photos in this collection yet</p>
-                  <Button
-                    onClick={() => setShowPhotoUpload(true)}
-                    variant="outline"
-                    size="sm"
-                    className="mt-2"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Your First Photos
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                  {renderedCollectionPhotos.map((photo) => (
-                    <ContextMenu key={photo.id}>
-                      <ContextMenuTrigger>
-                        <div className="relative group aspect-square rounded-lg overflow-hidden border bg-muted cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 ease-out">
-                          <div className="absolute top-2 left-2 z-20">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setSelectedPhotos((prev) => {
-                                  const next = new Set(prev)
-                                  if (next.has(photo.id)) {
-                                    next.delete(photo.id)
-                                  } else {
-                                    next.add(photo.id)
-                                  }
-                                  return next
-                                })
-                              }}
-                              className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                                selectedPhotos.has(photo.id)
-                                  ? 'bg-primary border-primary text-primary-foreground'
-                                  : 'border-white/60 bg-black/30 hover:border-white'
-                              }`}
-                              aria-label={selectedPhotos.has(photo.id) ? 'Deselect photo' : 'Select photo'}
-                            >
-                              {selectedPhotos.has(photo.id) && (
-                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                </svg>
-                              )}
-                            </button>
-                          </div>
-                          <Image
-                            src={getThumbnailUrl(photo.image_id, 420)}
-                            alt={photo.alt || photo.title}
-                            fill
-                            className="object-cover group-hover:scale-105 transition-transform"
-                            sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
-                          />
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setSelectedPhoto(photo)
-                                  setShowPhotoPreview(true)
-                                }}
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                </svg>
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  removePhotoFromCollection(photo.id)
-                                }}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                            <p className="text-white text-xs truncate font-medium">{photo.title}</p>
-                            {photo.camera && (
-                              <p className="text-white/80 text-xs truncate">{photo.camera}</p>
-                            )}
-                          </div>
-                          {/* EXIF Badge */}
-                          {(photo.camera || photo.settings) && (
-                            <div className="absolute top-2 right-2 bg-gradient-to-br from-amber-400 to-amber-600 text-white text-xs px-2 py-1 rounded-full shadow-lg border border-amber-300/50 flex items-center gap-1">
-                              <Camera className="w-3 h-3" />
-                              <span className="font-medium">EXIF</span>
-                            </div>
-                          )}
-                        </div>
-                      </ContextMenuTrigger>
-                      <ContextMenuContent>
-                        <ContextMenuItem onClick={() => {
-                          setSelectedPhoto(photo)
-                          setShowPhotoPreview(true)
-                        }}>
-                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                          Preview
-                        </ContextMenuItem>
-                        <ContextMenuItem onClick={() => {
-                          setEditingPhoto({...photo})
-                          setShowPhotoEdit(true)
-                        }}>
-                          <Pencil className="w-4 h-4 mr-2" />
-                          Edit Details
-                        </ContextMenuItem>
-                        <ContextMenuItem onClick={() => window.open(photo.image_url, '_blank')}>
-                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                          Open Original
-                        </ContextMenuItem>
-                        <ContextMenuSeparator />
-                        <ContextMenuItem
-                          onClick={() => removePhotoFromCollection(photo.id)}
-                          className="text-amber-600 focus:text-amber-600"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Remove from Collection
-                        </ContextMenuItem>
-                        <ContextMenuItem
-                          onClick={() => permanentlyDeletePhoto(photo)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Delete Permanently
-                        </ContextMenuItem>
-                      </ContextMenuContent>
-                    </ContextMenu>
-                  ))}
-                  </div>
-                  {collectionPhotos.length > renderedCollectionPhotos.length && (
-                    <div className="mt-4 flex justify-center">
+            {/* Photos Section (When viewing inside an album) */}
+            {currentPath.length > 0 && (
+              <div className="mb-8">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4 text-zinc-500" />
+                      Photos in Album ({collectionPhotos.length})
+                    </h3>
+                    {collectionPhotos.length > 0 && (
                       <Button
+                        onClick={toggleSelectAllPhotos}
+                        size="sm"
                         variant="outline"
-                        onClick={() => setPhotoRenderCount((prev) => prev + 120)}
+                        className="rounded-xl border-zinc-800 hover:bg-zinc-900 h-7 text-xs px-2.5 text-zinc-300"
                       >
-                        Load More ({collectionPhotos.length - renderedCollectionPhotos.length} remaining)
+                        {selectedPhotos.size === collectionPhotos.length ? 'Deselect All' : 'Select All'}
+                      </Button>
+                    )}
+                  </div>
+
+                  {selectedPhotos.size > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={removeSelectedPhotosFromCollection}
+                        size="sm"
+                        variant="outline"
+                        disabled={loadingStates.deleting}
+                        className="rounded-xl border-zinc-800 hover:bg-zinc-900 h-8 text-xs text-amber-400 hover:text-amber-300"
+                      >
+                        {loadingStates.deleting && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                        Remove Selected ({selectedPhotos.size})
+                      </Button>
+                      <Button
+                        onClick={permanentlyDeleteSelectedPhotos}
+                        size="sm"
+                        variant="destructive"
+                        disabled={loadingStates.deleting}
+                        className="rounded-xl h-8 text-xs"
+                      >
+                        {loadingStates.deleting && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                        {photoDeleteProgress
+                          ? `Deleting ${photoDeleteProgress.current}/${photoDeleteProgress.total}`
+                          : `Delete Permanently (${selectedPhotos.size})`}
                       </Button>
                     </div>
                   )}
-                </>
-              )}
-            </div>
-          </div>
+                </div>
+
+                {collectionPhotos.length === 0 ? (
+                  currentItems.length === 0 ? (
+                    /* Completely Empty Album */
+                    <div className="p-12 text-center rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/30 flex flex-col items-center justify-center">
+                      <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-4 text-zinc-500 shadow-inner">
+                        <Folder className="w-8 h-8" />
+                      </div>
+                      <h3 className="text-base font-semibold text-white mb-1">This album is empty</h3>
+                      <p className="text-sm text-zinc-400 max-w-sm mb-6">
+                        Upload your first photos to this album or create sub-albums to organize your content.
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <Button
+                          onClick={() => setShowPhotoUpload(true)}
+                          className="rounded-xl bg-white text-black hover:bg-zinc-200 font-semibold text-xs sm:text-sm px-5"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Upload Photos
+                        </Button>
+                        <Button
+                          onClick={() => setShowCreateFolder(true)}
+                          variant="outline"
+                          className="rounded-xl border-zinc-800 hover:bg-zinc-900 text-xs sm:text-sm px-5"
+                        >
+                          <Folder className="w-4 h-4 mr-2" />
+                          New Sub-Album
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                      {renderedCollectionPhotos.map((photo) => {
+                        const currentFolderId = currentPath[currentPath.length - 1]
+                        const currentCollection = allCollections.find(c => c.id === currentFolderId)
+                        const isCover = currentCollection?.cover_image_url === photo.image_url
+                        const isSelected = selectedPhotos.has(photo.id)
+
+                        return (
+                          <ContextMenu key={photo.id}>
+                            <ContextMenuTrigger asChild>
+                              <div className={`relative group aspect-[4/3] rounded-2xl overflow-hidden border transition-all duration-200 cursor-pointer ${
+                                isSelected
+                                  ? 'border-white/60 bg-zinc-900 shadow-lg ring-1 ring-white/40'
+                                  : 'border-zinc-800 bg-zinc-950 hover:border-zinc-700 hover:shadow-xl'
+                              }`}>
+                                {/* Checkbox */}
+                                <div className="absolute top-2 left-2 z-20">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setSelectedPhotos((prev) => {
+                                        const next = new Set(prev)
+                                        if (next.has(photo.id)) next.delete(photo.id)
+                                        else next.add(photo.id)
+                                        return next
+                                      })
+                                    }}
+                                    className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${
+                                      isSelected
+                                        ? 'bg-white border-white text-black shadow-md'
+                                        : 'border-white/40 bg-black/40 text-transparent hover:border-white backdrop-blur-sm'
+                                    }`}
+                                    aria-label={isSelected ? 'Deselect photo' : 'Select photo'}
+                                  >
+                                    <Check className={`w-3 h-3 stroke-[3] ${isSelected ? 'opacity-100' : 'opacity-0'}`} />
+                                  </button>
+                                </div>
+
+                                {/* Thumbnail */}
+                                <Image
+                                  src={getThumbnailUrl(photo.image_id, 450)}
+                                  alt={photo.alt || photo.title}
+                                  fill
+                                  className="object-cover group-hover:scale-105 transition-transform duration-300"
+                                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                                />
+
+                                {/* Top-Right Badges */}
+                                <div className="absolute top-2 right-2 z-20 flex items-center gap-1">
+                                  {isCover && (
+                                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-md flex items-center gap-1 shadow-sm">
+                                      <Star className="w-2.5 h-2.5 fill-emerald-300" /> Cover
+                                    </span>
+                                  )}
+                                  {(photo.camera || photo.settings) && (
+                                    <div className="bg-black/60 text-zinc-300 border border-white/20 text-[10px] font-medium px-2 py-0.5 rounded-full backdrop-blur-md flex items-center gap-1 shadow-sm">
+                                      <Camera className="w-2.5 h-2.5 text-zinc-400" />
+                                      <span>EXIF</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Hover Action Overlay */}
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 backdrop-blur-[1px] z-10">
+                                  <Button
+                                    size="icon"
+                                    variant="secondary"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setSelectedPhoto(photo)
+                                      setShowPhotoPreview(true)
+                                    }}
+                                    className="h-8 w-8 rounded-xl bg-zinc-800/90 text-white hover:bg-zinc-700 border border-zinc-700 shadow-md"
+                                    title="Preview Fullscreen"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="secondary"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleSetAsCover(photo)
+                                    }}
+                                    className="h-8 w-8 rounded-xl bg-zinc-800/90 text-white hover:bg-zinc-700 border border-zinc-700 shadow-md"
+                                    title="Set as Album Cover"
+                                  >
+                                    <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="secondary"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setEditingPhoto({...photo})
+                                      setShowPhotoEdit(true)
+                                    }}
+                                    className="h-8 w-8 rounded-xl bg-zinc-800/90 text-white hover:bg-zinc-700 border border-zinc-700 shadow-md"
+                                    title="Edit Details"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      removePhotoFromCollection(photo.id)
+                                    }}
+                                    className="h-8 w-8 rounded-xl bg-red-900/80 text-red-200 hover:bg-red-800 border border-red-700 shadow-md"
+                                    title="Remove from Album"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                </div>
+
+                                {/* Bottom Info Banner */}
+                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-2.5 pt-6 z-10 pointer-events-none">
+                                  <p className="text-white text-xs truncate font-medium">{photo.title}</p>
+                                  {photo.camera && (
+                                    <p className="text-zinc-400 text-[11px] truncate mt-0.5">{photo.camera}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent className="border-zinc-800 bg-zinc-950 text-white">
+                              <ContextMenuItem onClick={() => {
+                                setSelectedPhoto(photo)
+                                setShowPhotoPreview(true)
+                              }}>
+                                <Eye className="w-4 h-4 mr-2" />
+                                Preview Fullscreen
+                              </ContextMenuItem>
+                              <ContextMenuItem onClick={() => handleSetAsCover(photo)}>
+                                <ImageIcon className="w-4 h-4 mr-2 text-amber-400" />
+                                Set as Album Cover
+                              </ContextMenuItem>
+                              <ContextMenuItem onClick={() => {
+                                setEditingPhoto({...photo})
+                                setShowPhotoEdit(true)
+                              }}>
+                                <Pencil className="w-4 h-4 mr-2" />
+                                Edit Details
+                              </ContextMenuItem>
+                              <ContextMenuItem onClick={() => window.open(photo.image_url, '_blank')}>
+                                <ExternalLink className="w-4 h-4 mr-2" />
+                                Open Original
+                              </ContextMenuItem>
+                              <ContextMenuSeparator className="bg-zinc-800" />
+                              <ContextMenuItem
+                                onClick={() => removePhotoFromCollection(photo.id)}
+                                className="text-amber-400 focus:text-amber-300 focus:bg-amber-950/50"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Remove from Collection
+                              </ContextMenuItem>
+                              <ContextMenuItem
+                                onClick={() => permanentlyDeletePhoto(photo)}
+                                className="text-red-400 focus:text-red-300 focus:bg-red-950/50"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete Permanently
+                              </ContextMenuItem>
+                            </ContextMenuContent>
+                          </ContextMenu>
+                        )
+                      })}
+                    </div>
+
+                    {collectionPhotos.length > renderedCollectionPhotos.length && (
+                      <div className="mt-6 flex justify-center">
+                        <Button
+                          variant="outline"
+                          onClick={() => setPhotoRenderCount((prev) => prev + 120)}
+                          className="rounded-xl border-zinc-800 hover:bg-zinc-900"
+                        >
+                          Load More ({collectionPhotos.length - renderedCollectionPhotos.length} remaining)
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Root Empty State (when 0 root albums exist) */}
+            {currentPath.length === 0 && currentItems.length === 0 && (
+              <div className="p-16 text-center rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/20 flex flex-col items-center justify-center my-8">
+                <Folder className="w-16 h-16 text-zinc-700 mb-4" />
+                <h3 className="text-lg font-semibold text-white mb-1">
+                  {searchQuery ? 'No albums match your search' : 'No albums created yet'}
+                </h3>
+                <p className="text-sm text-zinc-400 max-w-sm mb-6">
+                  {searchQuery ? 'Try searching for a different keyword or clear the filter.' : 'Create your first album to begin organizing your photography galleries.'}
+                </p>
+                {!searchQuery && (
+                  <Button
+                    onClick={() => setShowCreateFolder(true)}
+                    className="rounded-xl bg-white text-black hover:bg-zinc-200 font-semibold px-6"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create First Album
+                  </Button>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Dialogs */}
       {/* Create Folder Dialog */}
-      <Dialog open={showCreateFolder} onOpenChange={setShowCreateFolder}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Create New Folder</DialogTitle>
-            <DialogDescription>
-              Enter a name for the new folder
+      {/* Featured Order Dialog */}
+      <Dialog open={showFeaturedOrder} onOpenChange={setShowFeaturedOrder}>
+        <DialogContent className="sm:max-w-[540px] max-h-[85vh] p-0 flex flex-col overflow-hidden border-zinc-800 bg-zinc-950 text-white shadow-2xl">
+          <DialogHeader className="p-5 pb-4 border-b border-zinc-800">
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold text-white">
+              <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
+              Featured Albums Order
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400 text-xs sm:text-sm">
+              Reorder albums to control how they appear on the homepage grid (up to 9 featured albums).
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          {/* Single clean scrollable list */}
+          <div className="p-4 sm:p-5 overflow-y-auto max-h-[55vh] space-y-2.5">
+            {(() => {
+              const featuredItems = allCollections
+                .filter(c => c.featured && !c.parent_id)
+                .sort((a, b) => (a.order || 0) - (b.order || 0))
+
+              if (featuredItems.length === 0) {
+                return (
+                  <div className="text-center py-10 rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/30">
+                    <Star className="w-10 h-10 mx-auto text-zinc-700 mb-3" />
+                    <p className="text-sm font-semibold text-white">No featured albums</p>
+                    <p className="text-xs text-zinc-400 mt-1 max-w-xs mx-auto">
+                      Mark albums as &quot;Featured on Home&quot; in Album Settings to showcase them on your homepage.
+                    </p>
+                  </div>
+                )
+              }
+
+              return (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleFeaturedDragEnd}
+                >
+                  <SortableContext
+                    items={featuredItems.map(c => c.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="space-y-2">
+                      {featuredItems.map((c, idx) => (
+                        <SortableFeaturedItem
+                          key={c.id}
+                          collection={c}
+                          index={idx}
+                          total={featuredItems.length}
+                          onMoveUp={() => moveFeaturedItem(idx, 'up')}
+                          onMoveDown={() => moveFeaturedItem(idx, 'down')}
+                          onUnfeature={() => handleUnfeature(c)}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              )
+            })()}
+          </div>
+
+          <DialogFooter className="p-4 sm:p-5 pt-3 border-t border-zinc-800 bg-zinc-950 flex flex-row items-center justify-between gap-3">
+            <span className="text-xs text-zinc-400">
+              {allCollections.filter(c => c.featured && !c.parent_id).length} of 9 featured slots used
+            </span>
+            <Button
+              onClick={() => setShowFeaturedOrder(false)}
+              className="rounded-xl bg-white text-black hover:bg-zinc-200 font-semibold text-xs sm:text-sm px-5 h-9"
+            >
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCreateFolder} onOpenChange={setShowCreateFolder}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Album</DialogTitle>
+            <DialogDescription>
+              Enter a name for the new album collection.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-2">
             <div className="space-y-2">
-              <Label htmlFor="folder-name">Folder Name</Label>
+              <Label htmlFor="folder-name" className="text-sm font-medium text-zinc-200">Album Name</Label>
               <Input
                 id="folder-name"
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
-                placeholder="Enter folder name"
+                placeholder="e.g., Landscapes 2026"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     createFolder()
                   }
                 }}
+                autoFocus
               />
             </div>
 
@@ -1675,15 +2482,17 @@ export default function CollectionsPage() {
                   setShowCreateFolder(false)
                   setNewFolderName('')
                 }}
+                className="rounded-xl border-zinc-800 hover:bg-zinc-900"
               >
                 Cancel
               </Button>
               <Button
                 onClick={createFolder}
                 disabled={!newFolderName.trim() || loadingStates.creating}
+                className="rounded-xl bg-white text-black hover:bg-zinc-200"
               >
                 {loadingStates.creating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Create Folder
+                Create Album
               </Button>
             </DialogFooter>
           </div>
@@ -1700,9 +2509,9 @@ export default function CollectionsPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 pt-2">
             <div className="space-y-2">
-              <Label htmlFor="rename-input">New Name</Label>
+              <Label htmlFor="rename-input" className="text-sm font-medium text-zinc-200">New Name</Label>
               <Input
                 id="rename-input"
                 value={renameValue}
@@ -1712,6 +2521,7 @@ export default function CollectionsPage() {
                     renameItem()
                   }
                 }}
+                autoFocus
               />
             </div>
 
@@ -1724,15 +2534,17 @@ export default function CollectionsPage() {
                   setRenamingItem(null)
                   setRenameValue('')
                 }}
+                className="rounded-xl border-zinc-800 hover:bg-zinc-900"
               >
                 Cancel
               </Button>
               <Button
                 onClick={renameItem}
                 disabled={!renameValue.trim() || loadingStates.renaming}
+                className="rounded-xl bg-white text-black hover:bg-zinc-200"
               >
                 {loadingStates.renaming && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Rename
+                Save
               </Button>
             </DialogFooter>
           </div>
@@ -1751,7 +2563,7 @@ export default function CollectionsPage() {
               <div className="flex items-center gap-3">
                 {propertiesItem.type === 'folder' ? (
                   propertiesItem.data && 'cover_image_url' in propertiesItem.data && propertiesItem.data.cover_image_url ? (
-                    <div className="w-12 h-12 flex-shrink-0 relative overflow-hidden rounded">
+                    <div className="w-12 h-12 flex-shrink-0 relative overflow-hidden rounded-xl border border-zinc-800">
                       <Image
                         src={propertiesItem.data.cover_image_url}
                         alt={propertiesItem.name}
@@ -1760,33 +2572,33 @@ export default function CollectionsPage() {
                       />
                     </div>
                   ) : (
-                    <Folder className="w-12 h-12 text-blue-500" />
+                    <Folder className="w-10 h-10 text-zinc-400" />
                   )
                 ) : (
-                  <FileImage className="w-12 h-12 text-gray-500" />
+                  <FileImage className="w-10 h-10 text-zinc-400" />
                 )}
                 <div>
-                  <h3 className="font-semibold">{propertiesItem.name}</h3>
-                  <p className="text-sm text-muted-foreground capitalize">
+                  <h3 className="font-semibold text-white">{propertiesItem.name}</h3>
+                  <p className="text-xs text-zinc-400 capitalize">
                     {propertiesItem.type}
                   </p>
                 </div>
               </div>
 
-              <Separator />
+              <Separator className="bg-zinc-800" />
 
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-sm font-medium">Type:</span>
-                  <span className="text-sm text-muted-foreground capitalize">
+                  <span className="text-sm text-zinc-400">Type:</span>
+                  <span className="text-sm font-medium text-white capitalize">
                     {propertiesItem.type}
                   </span>
                 </div>
 
                 {propertiesItem.modified && (
                   <div className="flex justify-between">
-                    <span className="text-sm font-medium">Modified:</span>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm text-zinc-400">Modified:</span>
+                    <span className="text-sm font-medium text-white">
                       {propertiesItem.modified}
                     </span>
                   </div>
@@ -1794,8 +2606,8 @@ export default function CollectionsPage() {
 
                 {propertiesItem.size && (
                   <div className="flex justify-between">
-                    <span className="text-sm font-medium">Size:</span>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm text-zinc-400">Size:</span>
+                    <span className="text-sm font-medium text-white">
                       {propertiesItem.size} bytes
                     </span>
                   </div>
@@ -1805,7 +2617,10 @@ export default function CollectionsPage() {
           )}
 
           <DialogFooter>
-            <Button onClick={() => setShowProperties(false)}>
+            <Button
+              onClick={() => setShowProperties(false)}
+              className="rounded-xl bg-white text-black hover:bg-zinc-200"
+            >
               Close
             </Button>
           </DialogFooter>
@@ -1815,59 +2630,89 @@ export default function CollectionsPage() {
       {/* Edit Collection Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-2xl max-h-[90vh] p-0 flex flex-col">
-          <DialogHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 border-b">
+          <DialogHeader className="px-5 pt-5 pb-4 sm:px-6 sm:pt-6 border-b border-zinc-800">
             <DialogTitle>Edit Collection</DialogTitle>
             <DialogDescription>
-              Update the collection details below
+              Update collection settings, hierarchy, and cover imagery.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 overflow-y-auto px-4 pb-4 sm:px-6 sm:pb-6">
-            <div className="space-y-2">
-              <Label htmlFor="edit-title">Title *</Label>
-              <Input
-                id="edit-title"
-                value={editFormData.title}
-                onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-description">Description</Label>
-              <Input
-                id="edit-description"
-                value={editFormData.description}
-                onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
-                placeholder="Optional description"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-cover">Cover Image</Label>
-              <div className="flex flex-col sm:flex-row gap-2">
+          <div className="space-y-6 overflow-y-auto px-5 py-4 sm:px-6 sm:py-6 flex-1">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-title" className="text-sm font-medium text-zinc-200">Title *</Label>
                 <Input
-                  id="edit-cover"
-                  value={editFormData.cover_image_url}
-                  onChange={(e) => setEditFormData({ ...editFormData, cover_image_url: e.target.value })}
-                  placeholder="https://... or select from existing images"
-                  className="flex-1"
+                  id="edit-title"
+                  value={editFormData.title}
+                  onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
+                  placeholder="Collection Title"
+                  required
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-description" className="text-sm font-medium text-zinc-200">Description</Label>
+                <Textarea
+                  id="edit-description"
+                  value={editFormData.description}
+                  onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                  placeholder="Optional brief description of this album..."
+                  rows={2}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-parent" className="text-sm font-medium text-zinc-200">Parent Album</Label>
+                <Select
+                  value={editFormData.parent_id || 'none'}
+                  onValueChange={(value) => setEditFormData({ ...editFormData, parent_id: value === 'none' ? '' : value })}
+                >
+                  <SelectTrigger className="w-full bg-zinc-900 border-zinc-800 text-white rounded-xl">
+                    <SelectValue placeholder="Select parent (optional)" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-zinc-950 border-zinc-800 text-white">
+                    <SelectItem value="none">Root level (No parent)</SelectItem>
+                    {allCollections
+                      .filter(collection => editingItem ? collection.id !== editingItem.id : true)
+                      .map(collection => (
+                        <SelectItem key={collection.id} value={collection.id}>
+                          {collection.title}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Cover Image Section */}
+            <div className="space-y-3 bg-zinc-900/40 p-4 rounded-xl border border-zinc-800/70">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="edit-cover" className="text-sm font-medium text-zinc-200">Cover Image</Label>
                 <Button
                   type="button"
                   variant="outline"
+                  size="sm"
                   onClick={openCoverImageSelector}
-                  className="w-full sm:w-auto"
+                  className="rounded-lg h-8 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700"
                 >
-                  Browse Images
+                  Browse Photos
                 </Button>
               </div>
-              <div className="mt-3 rounded-lg border p-3">
-                <p className="text-xs text-muted-foreground mb-2">
-                  Or upload a new cover image from your device
+
+              <Input
+                id="edit-cover"
+                value={editFormData.cover_image_url}
+                onChange={(e) => setEditFormData({ ...editFormData, cover_image_url: e.target.value })}
+                placeholder="https://... or choose from gallery"
+              />
+
+              <div className="rounded-xl border border-zinc-800/80 p-3 bg-zinc-950/50">
+                <p className="text-xs text-zinc-400 mb-2 font-medium">
+                  Upload new cover photo:
                 </p>
                 <CloudinaryUpload
                   currentImageUrl={editFormData.cover_image_url || undefined}
+                  cropAspect={3/2}
                   onUploadComplete={(data) => {
                     setEditFormData((prev) => ({ ...prev, cover_image_url: data.image_url }))
                     toast.success('Cover image uploaded')
@@ -1879,14 +2724,14 @@ export default function CollectionsPage() {
                   }
                 />
               </div>
+
               {editFormData.cover_image_url && (
-                <div className="mt-2">
+                <div className="relative aspect-[3/2] w-36 rounded-lg overflow-hidden border border-zinc-800 mt-2">
                   <Image
                     src={editFormData.cover_image_url}
                     alt="Cover preview"
-                    width={160}
-                    height={120}
-                    className="object-cover rounded border max-w-full h-auto"
+                    fill
+                    className="object-cover"
                     onError={(e) => {
                       e.currentTarget.style.display = 'none'
                     }}
@@ -1895,159 +2740,175 @@ export default function CollectionsPage() {
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-parent">Parent Collection</Label>
-              <Select
-                value={editFormData.parent_id || 'none'}
-                onValueChange={(value) => setEditFormData({ ...editFormData, parent_id: value === 'none' ? '' : value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select parent (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No parent (root level)</SelectItem>
-                  {allCollections
-                    .filter(collection => editingItem ? collection.id !== editingItem.id : true) // Can't be its own parent
-                    .map(collection => (
-                      <SelectItem key={collection.id} value={collection.id}>
-                        {collection.title}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="featured"
+            {/* Featured Setting */}
+            <div className="flex items-center justify-between p-4 rounded-xl border border-zinc-800 bg-zinc-900/40">
+              <div className="space-y-0.5">
+                <Label htmlFor="featured-toggle" className="text-sm font-medium text-white cursor-pointer">
+                  Featured on Homepage
+                </Label>
+                <p className="text-xs text-zinc-400">
+                  Highlight this album in the homepage curated portfolio
+                </p>
+              </div>
+              <Switch
+                id="featured-toggle"
                 checked={editFormData.featured}
-                onChange={(e) => setEditFormData({ ...editFormData, featured: e.target.checked })}
-                className="w-4 h-4 rounded border-gray-300"
+                onCheckedChange={(checked) => setEditFormData({ ...editFormData, featured: checked })}
               />
-              <Label htmlFor="featured" className="cursor-pointer">
-                Featured album on homepage
-              </Label>
             </div>
+          </div>
 
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setShowEditDialog(false)
-                  setEditingItem(null)
-                  setEditFormData({ title: '', description: '', cover_image_url: '', parent_id: '', featured: false })
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={editItem}
-                disabled={!editFormData.title.trim() || loadingStates.renaming}
-              >
-                {loadingStates.renaming && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Update Collection
-              </Button>
-            </DialogFooter>
+          <div className="px-5 py-4 sm:px-6 border-t border-zinc-800/80 bg-zinc-950 flex items-center justify-end gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowEditDialog(false)
+                setEditingItem(null)
+                setEditFormData({ title: '', description: '', cover_image_url: '', parent_id: '', featured: false })
+              }}
+              className="rounded-xl border-zinc-800 hover:bg-zinc-900"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={editItem}
+              disabled={!editFormData.title.trim() || loadingStates.renaming}
+              className="rounded-xl bg-white text-black hover:bg-zinc-200"
+            >
+              {loadingStates.renaming && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Save Changes
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Image Selector Dialog */}
       <Dialog open={showImageSelector} onOpenChange={setShowImageSelector}>
-        <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-5xl max-h-[90vh] p-0 flex flex-col">
-          <DialogHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 border-b">
+        <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-4xl max-h-[90vh] p-0 flex flex-col">
+          <DialogHeader className="px-5 pt-5 pb-4 sm:px-6 sm:pt-6 border-b border-zinc-800">
             <DialogTitle>Select Cover Image</DialogTitle>
             <DialogDescription>
-              Choose from photos in this album, or from all photos
+              Choose a cover photo from this album or across all portfolio uploads.
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 min-h-0 max-h-[72vh]">
+          <div className="flex-1 min-h-0 px-5 py-4 sm:px-6 overflow-y-auto">
             {coverImagesLoading ? (
-              <div className="flex items-center justify-center py-12 text-muted-foreground">
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Loading images...
+              <div className="flex flex-col items-center justify-center py-16 text-zinc-400 gap-3">
+                <Loader2 className="w-6 h-6 animate-spin text-zinc-300" />
+                <p className="text-sm">Loading portfolio images...</p>
               </div>
             ) : (
-              <div className="space-y-6 p-4">
-                <div>
-                  <h4 className="text-sm font-semibold mb-3">Photos In This Album</h4>
+              <Tabs defaultValue={coverCollectionImages.length > 0 ? "current" : "all"} className="w-full">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="current">
+                    In This Album ({coverCollectionImages.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="all">
+                    All Photos ({coverAllImages.length})
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="current">
                   {coverCollectionImages.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                      {coverCollectionImages.map((photo) => (
-                        <div
-                          key={`collection-${photo.id}`}
-                          className="relative aspect-square cursor-pointer rounded-lg overflow-hidden border-2 hover:border-primary transition-colors"
-                          onClick={() => {
-                            setEditFormData((prev) => ({ ...prev, cover_image_url: photo.image_url }))
-                            setShowImageSelector(false)
-                          }}
-                        >
-                          <Image
-                            src={photo.image_url}
-                            alt={photo.title}
-                            fill
-                            className="object-cover"
-                          />
-                          <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center">
-                            <div className="opacity-0 hover:opacity-100 text-white text-xs font-medium bg-black/50 px-2 py-1 rounded">
-                              Select
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {coverCollectionImages.map((photo) => {
+                        const isSelected = editFormData.cover_image_url === photo.image_url
+                        return (
+                          <div
+                            key={`collection-${photo.id}`}
+                            className={`group relative aspect-[4/3] cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
+                              isSelected
+                                ? 'border-white shadow-lg ring-2 ring-white/20'
+                                : 'border-zinc-800 hover:border-zinc-500'
+                            }`}
+                            onClick={() => {
+                              setEditFormData((prev) => ({ ...prev, cover_image_url: photo.image_url }))
+                              setShowImageSelector(false)
+                            }}
+                          >
+                            <Image
+                              src={photo.image_url}
+                              alt={photo.title}
+                              fill
+                              className="object-cover transition-transform group-hover:scale-105"
+                            />
+                            {isSelected && (
+                              <div className="absolute top-2 right-2 bg-white text-black p-1 rounded-full shadow-md z-10">
+                                <Check className="w-3.5 h-3.5" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2.5">
+                              <p className="text-xs text-white truncate font-medium">{photo.title}</p>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">No photos inside this album yet.</p>
+                    <div className="py-12 text-center text-sm text-zinc-500">
+                      No photos uploaded directly into this album yet. Switch to &ldquo;All Photos&rdquo; to choose from the global library.
+                    </div>
                   )}
-                </div>
+                </TabsContent>
 
-                <div>
-                  <h4 className="text-sm font-semibold mb-3">All Photos</h4>
+                <TabsContent value="all">
                   {coverAllImages.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                      {coverAllImages.map((photo) => (
-                        <div
-                          key={`all-${photo.id}`}
-                          className="relative aspect-square cursor-pointer rounded-lg overflow-hidden border-2 hover:border-primary transition-colors"
-                          onClick={() => {
-                            setEditFormData((prev) => ({ ...prev, cover_image_url: photo.image_url }))
-                            setShowImageSelector(false)
-                          }}
-                        >
-                          <Image
-                            src={photo.image_url}
-                            alt={photo.title}
-                            fill
-                            className="object-cover"
-                          />
-                          <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center">
-                            <div className="opacity-0 hover:opacity-100 text-white text-xs font-medium bg-black/50 px-2 py-1 rounded">
-                              Select
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {coverAllImages.map((photo) => {
+                        const isSelected = editFormData.cover_image_url === photo.image_url
+                        return (
+                          <div
+                            key={`all-${photo.id}`}
+                            className={`group relative aspect-[4/3] cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
+                              isSelected
+                                ? 'border-white shadow-lg ring-2 ring-white/20'
+                                : 'border-zinc-800 hover:border-zinc-500'
+                            }`}
+                            onClick={() => {
+                              setEditFormData((prev) => ({ ...prev, cover_image_url: photo.image_url }))
+                              setShowImageSelector(false)
+                            }}
+                          >
+                            <Image
+                              src={photo.image_url}
+                              alt={photo.title}
+                              fill
+                              className="object-cover transition-transform group-hover:scale-105"
+                            />
+                            {isSelected && (
+                              <div className="absolute top-2 right-2 bg-white text-black p-1 rounded-full shadow-md z-10">
+                                <Check className="w-3.5 h-3.5" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2.5">
+                              <p className="text-xs text-white truncate font-medium">{photo.title}</p>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">No photos available.</p>
+                    <div className="py-12 text-center text-sm text-zinc-500">
+                      No photos found in the library.
+                    </div>
                   )}
-                </div>
-              </div>
+                </TabsContent>
+              </Tabs>
             )}
-          </ScrollArea>
+          </div>
 
-          <DialogFooter>
+          <div className="px-5 py-3 sm:px-6 border-t border-zinc-800 bg-zinc-950 flex justify-end">
             <Button
               type="button"
               variant="outline"
               onClick={() => setShowImageSelector(false)}
+              className="rounded-xl border-zinc-800 hover:bg-zinc-900"
             >
               Cancel
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -2451,6 +3312,21 @@ export default function CollectionsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={!!confirmAction}
+        onOpenChange={(open) => !open && setConfirmAction(null)}
+        title={confirmAction?.title || 'Confirm Action'}
+        description={confirmAction?.description || 'Are you sure you want to continue?'}
+        confirmText={confirmAction?.confirmText || 'Confirm'}
+        variant="destructive"
+        onConfirm={async () => {
+          if (confirmAction) {
+            await confirmAction.action()
+          }
+        }}
+      />
     </div>
   )
 }

@@ -19,6 +19,7 @@ import Image from 'next/image'
 import { toast } from 'sonner'
 import { ReorderableStoryboard } from '@/components/reorderable-storyboard'
 import { CloudinaryUpload } from '@/components/cloudinary-upload'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, rectSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -250,20 +251,27 @@ export default function VideosManagementPage() {
     setShowForm(true)
   }
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this video?')) {
-      const { error } = await supabase
-        .from('videos')
-        .delete()
-        .eq('id', id)
+  const [deleteTargetVideo, setDeleteTargetVideo] = useState<VideoType | null>(null)
 
-      if (!error) {
-        toast.success('Video deleted successfully')
-        await revalidatePublicPaths(['/', '/videos'])
-        await fetchVideos()
-      } else {
-        toast.error('Failed to delete video')
-      }
+  const handleDelete = (id: string) => {
+    const video = videos.find(v => v.id === id)
+    if (video) setDeleteTargetVideo(video)
+  }
+
+  const confirmDeleteVideo = async () => {
+    if (!deleteTargetVideo) return
+
+    const { error } = await supabase
+      .from('videos')
+      .delete()
+      .eq('id', deleteTargetVideo.id)
+
+    if (!error) {
+      toast.success('Video deleted successfully')
+      await revalidatePublicPaths(['/', '/videos'])
+      await fetchVideos()
+    } else {
+      toast.error('Failed to delete video')
     }
   }
 
@@ -1095,6 +1103,17 @@ export default function VideosManagementPage() {
           </SortableContext>
         </DndContext>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={!!deleteTargetVideo}
+        onOpenChange={(open) => !open && setDeleteTargetVideo(null)}
+        title="Delete Video"
+        description={`Are you sure you want to delete "${deleteTargetVideo?.title}"? This video and its storyboard will be permanently removed.`}
+        confirmText="Delete Video"
+        variant="destructive"
+        onConfirm={confirmDeleteVideo}
+      />
     </div>
   )
 }

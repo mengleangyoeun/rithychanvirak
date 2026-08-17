@@ -1,14 +1,12 @@
 'use client'
 
 import Image from 'next/image'
-import { Award, Camera, ArrowRight } from 'lucide-react'
-import { motion } from 'motion/react'
+import { Award, Camera, ArrowUpRight, CheckCircle2, MapPin, Film, Briefcase, ChevronRight, Mail } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { CSSProperties } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 
-// TypeScript interfaces for about page data
 interface Experience {
   title: string
   organization: string
@@ -16,7 +14,7 @@ interface Experience {
   description?: string
 }
 
-interface Award {
+interface AwardType {
   title: string
   organization: string
   year: string
@@ -41,7 +39,7 @@ interface AboutData {
   profile_image_url?: string
   experience?: Experience[]
   skills?: Skill[]
-  awards?: Award[]
+  awards?: AwardType[]
   equipment?: EquipmentCategory[]
 }
 
@@ -69,19 +67,19 @@ async function getAboutData(): Promise<AboutData | null> {
       supabase.from('about_equipment_categories').select('*').eq('about_content_id', aboutContent.id).order('order')
     ])
 
-    // Fetch equipment items for ALL categories in one query
+    // Fetch equipment items for all categories
     const equipmentCategories = equipmentCategoriesRes.data || []
     const categoryIds = equipmentCategories.map(c => c.id)
 
     const { data: allEquipmentItems } = categoryIds.length > 0
       ? await supabase
-          .from('about_equipment_items')
-          .select('*')
-          .in('equipment_category_id', categoryIds)
-          .order('order')
+        .from('about_equipment_items')
+        .select('*')
+        .in('equipment_category_id', categoryIds)
+        .order('order')
       : { data: [] }
 
-    // Group items by category in-memory
+    // Group items by category
     const itemsByCategory = new Map<string, string[]>()
     for (const item of allEquipmentItems || []) {
       const list = itemsByCategory.get(item.equipment_category_id) || []
@@ -135,551 +133,348 @@ export default function AboutPage() {
     })
   }, [])
 
-  const fadeInUp = {
-    initial: { opacity: 0, y: 60 },
-    animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.8 }
-  }
-
-  const staggerContainer = {
-    animate: {
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  }
-
-  // Removed unused scaleIn animation
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8">
-          <Skeleton className="w-full h-full rounded-full" />
+      <main className="min-h-screen bg-[#030303] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-24">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          <div className="lg:col-span-5 aspect-[4/5] rounded-3xl bg-zinc-900/60 border border-zinc-800 animate-pulse" />
+          <div className="lg:col-span-7 space-y-6">
+            <Skeleton className="h-8 w-48 bg-zinc-900" />
+            <Skeleton className="h-14 w-full bg-zinc-900" />
+            <Skeleton className="h-28 w-full bg-zinc-900" />
+            <div className="grid grid-cols-2 gap-4 pt-4">
+              <Skeleton className="h-20 w-full bg-zinc-900" />
+              <Skeleton className="h-20 w-full bg-zinc-900" />
+            </div>
+          </div>
         </div>
-      </div>
+      </main>
     )
   }
 
   if (!aboutData) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <motion.div {...fadeInUp} className="text-center">
-          <h1 className="text-4xl font-bold mb-4">About</h1>
-          <p className="text-muted-foreground">About information not available yet.</p>
-        </motion.div>
+      <div className="min-h-screen bg-[#030303] flex items-center justify-center px-4">
+        <div className="text-center max-w-md">
+          <h1 className="text-3xl font-bold text-white mb-2">About</h1>
+          <p className="text-zinc-500 text-sm mb-6">Profile information is currently being updated.</p>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-black text-sm font-semibold hover:bg-zinc-200 transition-colors"
+          >
+            Back to Home
+          </Link>
+        </div>
       </div>
     )
   }
 
+  const paragraphs = aboutData.bio ? aboutData.bio.split('\n\n').filter(Boolean) : []
+
   return (
-    <div className="min-h-screen unified-background">
-      
-      {/* Modern Hero Section */}
-      <section className="relative min-h-[90vh] flex items-center justify-center pt-24 pb-20 overflow-hidden">
-        
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 xl:gap-20 items-center">
-            
-            {/* Modern Profile Image */}
-            <motion.div
-              {...fadeInUp}
-              className="relative order-2 lg:order-1"
-            >
-              <div className="relative w-80 h-80 lg:w-96 lg:h-96 xl:w-[30rem] xl:h-[30rem] mx-auto">
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 1, ease: "easeOut" }}
-                  className="relative w-full h-full group"
-                >
-                  {/* Modern geometric frame */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 via-purple-500/10 to-cyan-500/20 rounded-3xl blur-xl"></div>
-                  <div className="absolute -inset-2 bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-cyan-500/30 rounded-3xl blur-2xl opacity-30 group-hover:opacity-50 transition-opacity duration-700"></div>
+    <main className="min-h-screen bg-[#030303] text-zinc-100">
+      {/* Container */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 sm:pt-36 pb-28 space-y-20 sm:space-y-28">
 
-                  {/* Floating geometric shapes */}
-                  <motion.div
-                    animate={{
-                      rotate: [0, 360],
-                      scale: [1, 1.1, 1]
-                    }}
-                    transition={{
-                      duration: 20,
-                      repeat: Infinity,
-                      ease: "linear"
-                    }}
-                    className="absolute -top-8 -right-8 w-16 h-16 border-2 border-blue-400/60 rounded-2xl rotate-12 z-10"
-                  />
+        {/* Section 1: Hero Profile & Artistic Bio */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-start">
 
-                  <motion.div
-                    animate={{
-                      rotate: [360, 0],
-                      y: [0, -10, 0]
-                    }}
-                    transition={{
-                      duration: 15,
-                      repeat: Infinity,
-                      ease: "easeInOut"
-                    }}
-                    className="absolute -bottom-6 -left-6 w-12 h-12 bg-gradient-to-br from-purple-400 to-cyan-400 rounded-full opacity-80 z-10"
-                  />
-
-                  <motion.div
-                    animate={{
-                      rotate: [0, -90, 0],
-                      scale: [1, 1.2, 1]
-                    }}
-                    transition={{
-                      duration: 12,
-                      repeat: Infinity,
-                      ease: "easeInOut"
-                    }}
-                    className="absolute top-8 -left-4 w-8 h-8 border-2 border-cyan-400/60 rotate-45 z-10"
-                  />
-
-                  {/* Modern camera icon */}
-                  <motion.div
-                    animate={{
-                      rotate: [0, 5, -5, 0],
-                      y: [0, -5, 0]
-                    }}
-                    transition={{
-                      duration: 4,
-                      repeat: Infinity,
-                      ease: "easeInOut"
-                    }}
-                    className="absolute -top-6 right-8 w-14 h-14 bg-card/80 backdrop-blur-xl border border-foreground/20 rounded-2xl flex items-center justify-center z-20 shadow-2xl group-hover:shadow-blue-500/20 transition-shadow duration-500"
-                  >
-                    <Camera className="w-7 h-7 text-blue-400" />
-                  </motion.div>
-
-                  {/* Profile image */}
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
-                    className="relative w-full h-full overflow-hidden rounded-3xl shadow-2xl group-hover:shadow-blue-500/20 transition-all duration-700 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center"
-                  >
-                    {aboutData.profile_image_url ? (
-                      <Image
-                        src={aboutData.profile_image_url}
-                        alt={`${aboutData.name} profile`}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <Camera className="w-24 h-24 text-blue-400" />
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-blue-500/5 rounded-3xl"></div>
-                  </motion.div>
-
-                  {/* Decorative corner elements */}
-                  <div className="absolute top-4 left-4 w-6 h-6 border-l-2 border-t-2 border-blue-400/60 rounded-tl-lg"></div>
-                  <div className="absolute top-4 right-4 w-6 h-6 border-r-2 border-t-2 border-purple-400/60 rounded-tr-lg"></div>
-                  <div className="absolute bottom-4 left-4 w-6 h-6 border-l-2 border-b-2 border-cyan-400/60 rounded-bl-lg"></div>
-                  <div className="absolute bottom-4 right-4 w-6 h-6 border-r-2 border-b-2 border-blue-400/60 rounded-br-lg"></div>
-                </motion.div>
-              </div>
-            </motion.div>
-
-            {/* Enhanced Bio Content */}
-            <motion.div 
-              {...fadeInUp}
-              transition={{ delay: 0.2 }}
-              className="space-y-8 lg:space-y-12 order-1 lg:order-2"
-            >
-              {aboutData.name && (
-                <motion.div
-                  {...fadeInUp}
-                  transition={{ delay: 0.3 }}
-                >
-                  <h1 className="text-5xl lg:text-6xl xl:text-7xl font-black leading-tight text-foreground tracking-tighter mb-4">
-                    Hello,<br />
-                    I&apos;m <span className="bg-gradient-to-r from-foreground via-muted-foreground to-foreground bg-clip-text text-transparent">{aboutData.name.split(' ')[0]}</span>
-                  </h1>
-                  
-                  <div className="flex items-center gap-4 mt-6">
-                    <div className="w-12 h-px bg-gradient-to-r from-foreground to-transparent"></div>
-                    <div className="w-3 h-3 bg-foreground rounded-full animate-pulse"></div>
-                    <div className="w-12 h-px bg-gradient-to-l from-foreground to-transparent"></div>
-                  </div>
-                </motion.div>
+          {/* Left: Editorial Portrait Card */}
+          <div className="lg:col-span-5 relative group">
+            <div className="relative aspect-[4/5] w-full rounded-3xl overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-2xl">
+              {aboutData.profile_image_url ? (
+                <Image
+                  src={aboutData.profile_image_url}
+                  alt={`${aboutData.name || 'Photographer'} portrait`}
+                  fill
+                  priority
+                  sizes="(max-width: 1024px) 100vw, 42vw"
+                  className="object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-950 text-zinc-600">
+                  <Camera className="w-16 h-16 mb-2" />
+                  <span className="text-xs uppercase tracking-widest">Portrait</span>
+                </div>
               )}
-              
+
+              {/* Gradient Scrim */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+              {/* Floating Bottom Card Over Portrait */}
+              <div className="absolute bottom-4 inset-x-4 p-4 sm:p-5 rounded-2xl bg-zinc-950/80 border border-white/10 backdrop-blur-md">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-white tracking-tight">
+                      {aboutData.name || 'Rithy Chanvirak'}
+                    </h3>
+                    <p className="text-xs text-zinc-400 flex items-center gap-1.5 mt-0.5">
+                      <MapPin className="w-3 h-3 text-emerald-400" />
+                      Phnom Penh, Cambodia
+                    </p>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
+                    Travels Throughout Cambodia
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Bio & Artistic Vision */}
+          <div className="lg:col-span-7 flex flex-col justify-between space-y-8">
+            <div className="space-y-6">
+              {/* Header Label */}
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-xs font-semibold text-zinc-300">
+                <Film className="w-3.5 h-3.5 text-zinc-400" />
+                Director of Photography & Visual Storyteller
+              </div>
+
+              {/* Main Headline */}
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white leading-[1.15]">
+                {aboutData.title || `Capturing timeless narratives through the lens`}
+              </h1>
+
+              {/* Tagline / Subheading */}
               {aboutData.tagline && (
-                <motion.p
-                  {...fadeInUp}
-                  transition={{ delay: 0.4 }}
-                  className="text-xl lg:text-2xl text-foreground/80 leading-relaxed font-medium max-w-2xl"
-                >
-                  {aboutData.tagline}
-                </motion.p>
+                <p className="text-lg sm:text-xl text-zinc-300 font-medium leading-relaxed">
+                  &ldquo;{aboutData.tagline}&rdquo;
+                </p>
               )}
-              
-              {aboutData.bio && (
-                <motion.div
-                  {...fadeInUp}
-                  transition={{ delay: 0.5 }}
-                  className="prose prose-lg prose-invert max-w-none leading-relaxed text-foreground/75"
-                  style={{
-                    '--tw-prose-body': 'rgba(255, 255, 255, 0.75)',
-                    '--tw-prose-headings': 'rgb(var(--foreground))',
-                  } as CSSProperties & { [key: string]: string }}
-                >
+
+              {/* Bio Paragraphs */}
+              <div className="space-y-4 text-sm sm:text-base text-zinc-400 leading-relaxed">
+                {paragraphs.length > 0 ? (
+                  paragraphs.map((p, idx) => (
+                    <p key={idx}>{p}</p>
+                  ))
+                ) : (
                   <p>{aboutData.bio}</p>
-                </motion.div>
-              )}
+                )}
+              </div>
+            </div>
 
-              <motion.div
-                {...fadeInUp}
-                transition={{ delay: 0.6 }}
-                className="pt-6"
+            {/* Quick Stats / Highlights */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 pt-4 border-t border-zinc-800/80">
+              <div className="p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/70">
+                <div className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">4f+</div>
+                <div className="text-xs text-zinc-400 mt-0.5">Years Experience</div>
+              </div>
+              <div className="p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/70">
+                <div className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">50+</div>
+                <div className="text-xs text-zinc-400 mt-0.5">Film & Photo Sets</div>
+              </div>
+              <div className="p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/70 col-span-2 sm:col-span-1">
+                <div className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">100%</div>
+                <div className="text-xs text-zinc-400 mt-0.5">Custom Color & Craft</div>
+              </div>
+            </div>
+
+            {/* Primary Action Button */}
+            <div className="pt-2 flex items-center gap-3 flex-wrap">
+              <Link
+                href="/contact"
+                className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-full bg-white text-black font-semibold text-sm hover:bg-zinc-200 transition-all duration-300 shadow-xl group"
               >
-                <motion.a
-                  href="/contact"
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="bg-foreground text-background border border-foreground inline-flex items-center px-8 py-4 font-bold tracking-wide hover:bg-transparent hover:text-foreground transition-all duration-300 rounded-xl shadow-lg"
-                >
-                  LET&apos;S WORK TOGETHER!
-                  <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform" />
-                </motion.a>
-              </motion.div>
-            </motion.div>
+                <span>Initiate a Project</span>
+                <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              </Link>
+              <Link
+                href="/gallery"
+                className="inline-flex items-center gap-2 px-5 py-3.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-200 text-sm font-semibold hover:bg-zinc-800 hover:text-white transition-colors"
+              >
+                View Works
+              </Link>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Enhanced Skills Section */}
-      {aboutData.skills && aboutData.skills.length > 0 && (
-        <motion.section 
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          transition={{ duration: 0.8 }}
-          className="py-20"
-        >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-              className="text-center mb-16"
-            >
-              <div className="inline-flex items-center gap-4 mb-6">
-                <div className="w-8 h-px bg-foreground"></div>
-                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
-                  Skills & <span className="italic font-light">Expertise</span>
+        {/* Section 2: Disciplines & Specialized Skills */}
+        {aboutData.skills && aboutData.skills.length > 0 && (
+          <section className="p-8 sm:p-12 rounded-3xl bg-zinc-950 border border-zinc-800/80 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">Disciplines</span>
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mt-1">
+                  Creative & Technical Expertise
                 </h2>
-                <div className="w-8 h-px bg-foreground"></div>
               </div>
-              <p className="text-foreground/75 text-lg max-w-xl mx-auto">
-                Technical skills and creative expertise I bring to every project
+              <p className="text-xs sm:text-sm text-zinc-400 max-w-sm">
+                From pre-production creative direction through high-fidelity cinema mastering.
               </p>
-            </motion.div>
-            
-            <motion.div 
-              variants={staggerContainer}
-              initial="initial"
-              whileInView="animate"
-              className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"
-            >
-              {aboutData.skills.map((skill: Skill) => (
-                <motion.div
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 pt-2">
+              {aboutData.skills.map((skill) => (
+                <div
                   key={skill._key}
-                  variants={{
-                    initial: { opacity: 0, y: 30, scale: 0.9 },
-                    animate: { opacity: 1, y: 0, scale: 1 }
-                  }}
-                  whileHover={{ y: -8, scale: 1.05 }}
-                  className="bg-card border border-border rounded-2xl text-center py-6 px-4 hover:shadow-xl transition-all duration-300 group"
+                  className="flex items-center gap-3 p-3.5 sm:p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 hover:border-zinc-600 hover:bg-zinc-900 transition-all duration-300"
                 >
-                  <div className="w-12 h-12 bg-secondary rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:bg-foreground transition-colors duration-300">
-                    {skill.icon ? (
-                      <span className="text-2xl">{skill.icon}</span>
-                    ) : (
-                      <div className="w-6 h-6 bg-foreground rounded group-hover:bg-background transition-colors duration-300"></div>
+                  <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-white text-sm">
+                    {skill.icon || <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+                  </div>
+                  <span className="text-xs sm:text-sm font-semibold text-white truncate">
+                    {skill.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Section 3: Professional Experience & Career Milestones */}
+        {aboutData.experience && aboutData.experience.length > 0 && (
+          <section className="space-y-8">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">Trajectory</span>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mt-1">
+                Selected Experience & Productions
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+              {aboutData.experience.map((exp, idx) => (
+                <div
+                  key={idx}
+                  className="p-6 sm:p-8 rounded-3xl bg-zinc-950 border border-zinc-800/80 hover:border-zinc-700 transition-all duration-300 flex flex-col justify-between space-y-4"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-zinc-900 border border-zinc-800 text-zinc-300">
+                        {exp.period}
+                      </span>
+                      <Briefcase className="w-4 h-4 text-zinc-600" />
+                    </div>
+
+                    <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                      {exp.title}
+                    </h3>
+                    <p className="text-sm font-medium text-zinc-400 mt-1">
+                      {exp.organization}
+                    </p>
+
+                    {exp.description && (
+                      <p className="text-xs sm:text-sm text-zinc-400 mt-3 leading-relaxed">
+                        {exp.description}
+                      </p>
                     )}
                   </div>
-                  <p className="text-sm font-bold text-foreground group-hover:text-blue-500 transition-colors duration-300 leading-tight">{skill.name}</p>
-                </motion.div>
+                </div>
               ))}
-            </motion.div>
-          </div>
-        </motion.section>
-      )}
+            </div>
+          </section>
+        )}
 
-      {/* Enhanced Experience Section */}
-      {aboutData.experience && aboutData.experience.length > 0 && (
-        <motion.section 
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          transition={{ duration: 0.8 }}
-          className="py-20"
-        >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-              className="text-center mb-16"
-            >
-              <div className="inline-flex items-center gap-4 mb-6">
-                <div className="w-8 h-px bg-foreground"></div>
-                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
-                  Professional <span className="italic font-light">Experience</span>
-                </h2>
-                <div className="w-8 h-px bg-foreground"></div>
-              </div>
-              <p className="text-foreground/75 text-lg max-w-xl mx-auto">
-                My journey through various roles and achievements in photography
-              </p>
-            </motion.div>
-            
-            <motion.div 
-              variants={staggerContainer}
-              initial="initial"
-              whileInView="animate"
-              className="space-y-8"
-            >
-              {aboutData.experience.map((exp: Experience, index: number) => (
-                <motion.div
-                  key={index}
-                  variants={{
-                    initial: { opacity: 0, x: -50 },
-                    animate: { opacity: 1, x: 0 }
-                  }}
-                  whileHover={{ x: 8 }}
-                  className="relative"
+        {/* Section 4: Awards & Recognition */}
+        {aboutData.awards && aboutData.awards.length > 0 && (
+          <section className="space-y-8">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">Accolades</span>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mt-1">
+                Honors & Industry Recognition
+              </h2>
+            </div>
+
+            <div className="rounded-3xl border border-zinc-800/80 bg-zinc-950 overflow-hidden divide-y divide-zinc-800/60 shadow-xl">
+              {aboutData.awards.map((award, idx) => (
+                <div
+                  key={idx}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 sm:p-6 hover:bg-zinc-900/40 transition-colors"
                 >
-                  <div className="bg-card border border-border rounded-2xl p-8 ml-8 relative hover:shadow-xl transition-all duration-300 group">
-                    {/* Timeline dot */}
-                    <div className="absolute w-6 h-6 bg-foreground rounded-full -left-4 top-8 border-4 border-background group-hover:scale-125 transition-transform duration-300"></div>
-                    
-                    {/* Timeline line */}
-                    {aboutData.experience && index < aboutData.experience.length - 1 && (
-                      <div className="absolute w-px h-16 bg-border -left-[7px] top-14"></div>
-                    )}
-                    
-                    <div className="space-y-4">
-                      <div>
-                        <h3 className="text-xl lg:text-2xl font-bold text-foreground mb-2 group-hover:text-blue-500 transition-colors duration-300">
-                          {exp.title}
-                        </h3>
-                        <p className="text-foreground/80 font-medium mb-4 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
-                          <span className="text-blue-400 font-semibold">{exp.organization}</span>
-                          <span className="hidden sm:block w-2 h-2 bg-foreground/60 rounded-full"></span>
-                          <span className="text-foreground/70">{exp.period}</span>
-                        </p>
-                      </div>
-                      
-                      {exp.description && (
-                        <p className="text-foreground/75 leading-relaxed text-lg">
-                          {exp.description}
-                        </p>
-                      )}
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+                      <Award className="w-5 h-5 text-amber-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                        {award.title}
+                      </h3>
+                      <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
+                        {award.organization}
+                      </p>
                     </div>
                   </div>
-                </motion.div>
-              ))}
-            </motion.div>
-          </div>
-        </motion.section>
-      )}
-
-      {/* Enhanced Awards Section */}
-      {aboutData.awards && aboutData.awards.length > 0 && (
-        <motion.section 
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          transition={{ duration: 0.8 }}
-          className="py-20"
-        >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-              className="text-center mb-16"
-            >
-              <div className="inline-flex items-center gap-4 mb-6">
-                <div className="w-8 h-px bg-foreground"></div>
-                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
-                  Awards & <span className="italic font-light">Recognition</span>
-                </h2>
-                <div className="w-8 h-px bg-foreground"></div>
-              </div>
-              <p className="text-foreground/75 text-lg max-w-xl mx-auto">
-                Recognition and achievements throughout my photography career
-              </p>
-            </motion.div>
-            
-            <motion.div 
-              variants={staggerContainer}
-              initial="initial"
-              whileInView="animate"
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-            >
-              {aboutData.awards.map((award: Award, index: number) => (
-                <motion.div
-                  key={index}
-                  variants={{
-                    initial: { opacity: 0, y: 40, scale: 0.9 },
-                    animate: { opacity: 1, y: 0, scale: 1 }
-                  }}
-                  whileHover={{ y: -12, scale: 1.05 }}
-                  className="bg-card border border-border rounded-2xl text-center p-8 hover:shadow-2xl transition-all duration-500 group"
-                >
-                  <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:rotate-12 transition-transform duration-300 shadow-lg">
-                    <Award className="w-8 h-8 text-white" />
-                  </div>
-                  <h3 className="font-bold text-lg lg:text-xl mb-4 text-foreground group-hover:text-yellow-500 transition-colors duration-300 leading-tight">
-                    {award.title}
-                  </h3>
-                  <p className="text-blue-400 font-medium mb-2">
-                    {award.organization}
-                  </p>
-                  <p className="text-sm text-foreground/70 bg-secondary px-3 py-1 rounded-full inline-block">
+                  <span className="px-3 py-1 rounded-full text-xs font-mono font-semibold bg-zinc-900 border border-zinc-800 text-zinc-300 self-start sm:self-center">
                     {award.year}
-                  </p>
-                </motion.div>
+                  </span>
+                </div>
               ))}
-            </motion.div>
-          </div>
-        </motion.section>
-      )}
+            </div>
+          </section>
+        )}
 
-      {/* Enhanced Equipment Section */}
-      {aboutData.equipment && aboutData.equipment.length > 0 && (
-        <motion.section 
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          transition={{ duration: 0.8 }}
-          className="py-20"
-        >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-              className="text-center mb-16"
-            >
-              <div className="inline-flex items-center gap-4 mb-6">
-                <div className="w-8 h-px bg-foreground"></div>
-                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
-                  Professional <span className="italic font-light">Equipment</span>
+        {/* Section 5: Production Gear & Technical Arsenal */}
+        {aboutData.equipment && aboutData.equipment.length > 0 && (
+          <section className="space-y-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">Equipment</span>
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mt-1">
+                  Camera Systems & Production Gear
                 </h2>
-                <div className="w-8 h-px bg-foreground"></div>
               </div>
-              <p className="text-foreground/75 text-lg max-w-xl mx-auto">
-                The tools and gear I use to capture exceptional photography
+              <p className="text-xs sm:text-sm text-zinc-400 max-w-sm">
+                Industry-standard cinema cameras, prime optics, lighting, and aerial systems.
               </p>
-            </motion.div>
-            
-            <motion.div 
-              variants={staggerContainer}
-              initial="initial"
-              whileInView="animate"
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-            >
-              {aboutData.equipment.map((category: EquipmentCategory, index: number) => (
-                <motion.div
-                  key={index}
-                  variants={{
-                    initial: { opacity: 0, y: 40 },
-                    animate: { opacity: 1, y: 0 }
-                  }}
-                  whileHover={{ y: -8 }}
-                  className="bg-card border border-border rounded-2xl p-8 hover:shadow-xl transition-all duration-300 group"
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {aboutData.equipment.map((cat, idx) => (
+                <div
+                  key={idx}
+                  className="p-6 sm:p-7 rounded-3xl bg-zinc-950 border border-zinc-800/80 hover:border-zinc-700 transition-all duration-300 space-y-4"
                 >
-                  <div className="flex items-center space-x-4 mb-8">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform duration-300 shadow-lg">
-                      <Camera className="w-6 h-6 text-white" />
-                    </div>
-                    <h3 className="text-xl font-bold text-foreground group-hover:text-blue-500 transition-colors duration-300">
-                      {category.category}
+                  <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-800/80">
+                    <Camera className="w-4 h-4 text-zinc-400" />
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-white">
+                      {cat.category}
                     </h3>
                   </div>
-                  
-                  <ul className="space-y-4">
-                    {category.items.map((item: string, itemIndex: number) => (
-                      <motion.li 
-                        key={itemIndex} 
-                        initial={{ opacity: 0, x: -20 }}
-                        whileInView={{ opacity: 1, x: 0 }}
-                        transition={{ delay: itemIndex * 0.1 }}
-                        className="text-foreground/75 flex items-start group-hover:text-foreground transition-colors duration-300"
-                      >
-                        <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                        <span className="leading-relaxed">{item}</span>
-                      </motion.li>
+
+                  <ul className="space-y-2.5">
+                    {cat.items.map((item, itemIdx) => (
+                      <li key={itemIdx} className="text-xs sm:text-sm text-zinc-300 flex items-start gap-2.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 mt-2 shrink-0" />
+                        <span className="leading-snug">{item}</span>
+                      </li>
                     ))}
                   </ul>
-                </motion.div>
+                </div>
               ))}
-            </motion.div>
-          </div>
-        </motion.section>
-      )}
+            </div>
+          </section>
+        )}
 
-      {/* Enhanced Call to Action */}
-      <motion.section 
-        initial={{ opacity: 0, y: 50 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
-        className="py-24 bg-gradient-to-b from-background to-card"
-      >
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="bg-card/80 backdrop-blur-xl border border-border rounded-3xl p-12 lg:p-16 shadow-2xl"
-          >
-            <motion.div
-              initial={{ scale: 0.9 }}
-              whileInView={{ scale: 1 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="space-y-8"
-            >            
-              <h2 className="text-4xl lg:text-6xl font-black text-foreground leading-tight tracking-tighter">
-                Ready to create<br />
-                <span className="bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">something amazing?</span>
-              </h2>
-              
-              <div className="flex items-center justify-center gap-4 my-8">
-                <div className="w-16 h-px bg-gradient-to-r from-transparent via-foreground to-transparent"></div>
-                <div className="w-3 h-3 bg-foreground rounded-full animate-pulse"></div>
-                <div className="w-16 h-px bg-gradient-to-r from-transparent via-foreground to-transparent"></div>
-              </div>
-              
-              <p className="text-xl lg:text-2xl text-foreground/80 max-w-3xl mx-auto leading-relaxed font-medium">
-                Have a project in mind? Let&apos;s discuss how we can work together.
-              </p>
-              
-              <div className="flex flex-col sm:flex-row gap-6 justify-center pt-8">
-                <motion.a
-                  href="/contact"
-                  whileHover={{ scale: 1.05, y: -4 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="group bg-foreground text-background border border-foreground inline-flex items-center px-8 py-4 font-bold tracking-wide hover:bg-transparent hover:text-foreground transition-all duration-300 rounded-xl shadow-lg text-lg"
-                >
-                  LET&apos;S TALK
-                  <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform" />
-                </motion.a>
-                
-                <motion.a
-                  href="/gallery"
-                  whileHover={{ scale: 1.05, y: -4 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="group bg-secondary text-foreground border border-border inline-flex items-center px-8 py-4 font-bold tracking-wide hover:bg-foreground hover:text-background transition-all duration-300 rounded-xl shadow-lg text-lg"
-                >
-                  VIEW PORTFOLIO
-                  <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform" />
-                </motion.a>
-              </div>
-            </motion.div>
-          </motion.div>
-        </div>
-      </motion.section>
-    </div>
+        {/* Section 6: Editorial Collaboration Callout Banner */}
+        <section className="relative overflow-hidden rounded-3xl border border-zinc-800 bg-gradient-to-b from-zinc-900/80 to-zinc-950 p-8 sm:p-14 text-center space-y-6">
+          <div className="max-w-2xl mx-auto space-y-3">
+            <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
+              Let&apos;s bring your cinematic vision to life
+            </h2>
+            <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
+              Available for commercial productions, editorial photography, and documentary projects across Cambodia.
+            </p>
+          </div>
+
+          <div className="pt-2 flex items-center justify-center gap-4 flex-wrap">
+            <Link
+              href="/contact"
+              className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-white text-black font-semibold text-sm hover:bg-zinc-200 transition-colors shadow-2xl"
+            >
+              <Mail className="w-4 h-4" />
+              <span>Get in Touch</span>
+            </Link>
+            <Link
+              href="/videos"
+              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-zinc-900 border border-zinc-700 text-zinc-200 font-semibold text-sm hover:bg-zinc-800 hover:text-white transition-colors"
+            >
+              <span>Explore Films</span>
+              <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </section>
+
+      </div>
+    </main>
   )
 }

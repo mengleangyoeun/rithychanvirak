@@ -398,18 +398,18 @@ export function CloudinaryBulkUpload({ onUploadComplete, folder }: CloudinaryBul
 
       {/* Upload Progress */}
       {uploading && (
-        <div className="space-y-3 p-6 border-2 border-dashed border-border rounded-lg">
+        <div className="space-y-3 p-5 border border-dashed border-zinc-700 bg-zinc-900/40 rounded-xl">
           <div className="flex items-center gap-3">
-            <Loader2 className="w-5 h-5 animate-spin text-primary" />
+            <Loader2 className="w-5 h-5 animate-spin text-white" />
             <div className="flex-1">
-              <p className="text-sm font-medium">
-                {compressionStatus || 'Uploading & extracting metadata...'}
+              <p className="text-sm font-medium text-white">
+                {compressionStatus || 'Uploading & extracting EXIF metadata...'}
               </p>
-              <p className="text-xs text-muted-foreground">{currentFile}</p>
+              <p className="text-xs text-zinc-400 truncate">{currentFile}</p>
             </div>
           </div>
-          <Progress value={progress} className="h-2" />
-          <p className="text-xs text-muted-foreground text-right">{Math.round(progress)}%</p>
+          <Progress value={progress} className="h-2 bg-zinc-800" />
+          <p className="text-xs text-zinc-400 text-right">{Math.round(progress)}%</p>
         </div>
       )}
 
@@ -418,8 +418,8 @@ export function CloudinaryBulkUpload({ onUploadComplete, folder }: CloudinaryBul
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
-              <p className="text-sm font-medium">{uploadedImages.length} image{uploadedImages.length > 1 ? 's' : ''} uploaded</p>
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <p className="text-sm font-medium text-white">{uploadedImages.length} image{uploadedImages.length > 1 ? 's' : ''} uploaded</p>
             </div>
             <div className="flex gap-2">
               <Button
@@ -428,8 +428,9 @@ export function CloudinaryBulkUpload({ onUploadComplete, folder }: CloudinaryBul
                 size="sm"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
+                className="rounded-xl border-zinc-800 hover:bg-zinc-900 h-8 text-xs"
               >
-                <Upload className="w-4 h-4 mr-2" />
+                <Upload className="w-3.5 h-3.5 mr-1.5" />
                 Add More
               </Button>
               <Button
@@ -438,31 +439,32 @@ export function CloudinaryBulkUpload({ onUploadComplete, folder }: CloudinaryBul
                 size="sm"
                 onClick={handleClearAll}
                 disabled={uploading}
+                className="rounded-xl border-zinc-800 hover:bg-zinc-900 h-8 text-xs text-zinc-400 hover:text-white"
               >
                 Clear All
               </Button>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 max-h-96 overflow-y-auto border rounded-lg p-3">
+          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 max-h-80 overflow-y-auto border border-zinc-800 rounded-xl p-3 bg-zinc-950/60 scrollbar-thin scrollbar-thumb-zinc-700">
             {uploadedImages.map((image, index) => (
-              <div key={index} className="relative aspect-square group">
+              <div key={index} className="relative aspect-square group rounded-lg overflow-hidden border border-zinc-800">
                 <Image
                   src={image.preview}
                   alt={image.name}
                   fill
-                  className="object-cover rounded-lg"
+                  className="object-cover"
                 />
                 <Button
                   type="button"
                   variant="destructive"
                   size="icon"
-                  className="absolute top-1 right-1 w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute top-1.5 right-1.5 w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-red-600/90 hover:bg-red-600"
                   onClick={() => handleRemove(index)}
                 >
                   <X className="w-3 h-3" />
                 </Button>
-                <div className="absolute bottom-1 left-1 right-1 bg-black/70 text-white text-xs px-1 py-0.5 rounded truncate">
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent text-white text-[11px] px-2 py-1 truncate">
                   {image.name}
                 </div>
               </div>

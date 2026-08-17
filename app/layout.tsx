@@ -55,15 +55,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark scroll-smooth">
+    <html lang="en" className="dark scroll-smooth" suppressHydrationWarning>
       <head>
         {/* Preconnect to external domains */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://res.cloudinary.com" />
         <link rel="dns-prefetch" href="https://res.cloudinary.com" />
-        {/* Web App Manifest */}
-        <link rel="manifest" href="/manifest.json" />
+        {/* Web App Manifest is served via Next.js metadata from app/manifest.json */}
       </head>
       <body
         className={`${inter.variable} ${livvic.variable} antialiased min-h-screen flex flex-col`}

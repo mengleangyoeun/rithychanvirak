@@ -171,7 +171,7 @@ export default function VideoPage({ params }: { params: Promise<{ slug: string }
   }
 
   return (
-    <main className="unified-background min-h-screen">
+    <main className="min-h-screen bg-[#030303] text-zinc-100">
       <div className="relative py-24 px-4 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto">
 

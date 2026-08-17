@@ -38,39 +38,31 @@ type SiteSettingTemplate = {
   description: string
 }
 
-const CONTACT_PRESET_EMOJIS: Record<ContactInfo['type'], string[]> = {
-  email: ['📧', '✉️', '📩'],
-  phone: ['📞', '☎️', '📱'],
-  instagram: ['📸', '🎞️', '✨'],
-  website: ['🌐', '🔗', '🧭'],
-  location: ['📍', '🗺️', '🏢'],
-}
-
 const CONTACT_TEMPLATES: ContactTemplate[] = [
   {
     title: 'Business Email',
     description: 'Primary email contact for inquiries',
-    form: { type: 'email', label: 'Email', value: 'hello@example.com', icon: '📧' },
+    form: { type: 'email', label: 'Email', value: 'hello@example.com', icon: '' },
   },
   {
     title: 'Phone Number',
     description: 'Direct mobile or office number',
-    form: { type: 'phone', label: 'Phone', value: '+1 555 000 0000', icon: '📞' },
+    form: { type: 'phone', label: 'Phone', value: '+1 555 000 0000', icon: '' },
   },
   {
     title: 'Instagram Profile',
     description: 'Social profile for daily updates',
-    form: { type: 'instagram', label: 'Instagram', value: '@yourhandle', icon: '📸' },
+    form: { type: 'instagram', label: 'Instagram', value: '@yourhandle', icon: '' },
   },
   {
     title: 'Website',
     description: 'Main portfolio or business website',
-    form: { type: 'website', label: 'Website', value: 'https://example.com', icon: '🌐' },
+    form: { type: 'website', label: 'Website', value: 'https://example.com', icon: '' },
   },
   {
     title: 'Studio Location',
     description: 'Public location or city',
-    form: { type: 'location', label: 'Location', value: 'City, Country', icon: '📍' },
+    form: { type: 'location', label: 'Location', value: 'City, Country', icon: '' },
   },
 ]
 
@@ -704,7 +696,7 @@ export default function ContentManagementPage() {
       ...prev,
       type,
       label: prev.label || defaultLabelByType[type],
-      icon: prev.icon || CONTACT_PRESET_EMOJIS[type][0],
+      icon: '',
     }))
   }
 
@@ -979,7 +971,7 @@ CREATE TABLE services (
               {/* Add New Service */}
               <div className="border rounded-lg p-4 space-y-4">
                 <h3 className="font-semibold">Add New Service</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="service-number">Number</Label>
                     <Input
@@ -988,16 +980,6 @@ CREATE TABLE services (
                       value={serviceForm.number}
                       onChange={(e) => setServiceForm(prev => ({ ...prev, number: parseInt(e.target.value) }))}
                       placeholder="1"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="service-icon">Icon (Emoji)</Label>
-                    <Input
-                      id="service-icon"
-                      value={serviceForm.icon}
-                      onChange={(e) => setServiceForm(prev => ({ ...prev, icon: e.target.value }))}
-                      placeholder="💍"
                     />
                   </div>
                 </div>
@@ -1237,7 +1219,7 @@ CREATE TABLE services (
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="contact-type">Type</Label>
                     <Select
@@ -1255,30 +1237,6 @@ CREATE TABLE services (
                         <SelectItem value="location">Location</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="contact-icon">Icon (Emoji)</Label>
-                    <Input
-                      id="contact-icon"
-                      value={contactForm.icon}
-                      onChange={(e) => setContactForm(prev => ({ ...prev, icon: e.target.value }))}
-                      placeholder=":emoji:"
-                    />
-                    <div className="flex flex-wrap gap-2">
-                      {CONTACT_PRESET_EMOJIS[contactForm.type].map((emoji) => (
-                        <button
-                          key={`${contactForm.type}-${emoji}`}
-                          type="button"
-                          className={`rounded-md border px-2 py-1 text-sm transition ${
-                            contactForm.icon === emoji ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-muted'
-                          }`}
-                          onClick={() => setContactForm((prev) => ({ ...prev, icon: emoji }))}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 </div>
 
@@ -1505,7 +1463,7 @@ CREATE TABLE services (
               {/* Add New Skill */}
               <div className="border rounded-lg p-4 space-y-4">
                 <h3 className="font-semibold">Add Skill</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="skill-name">Skill Name</Label>
                     <Input
@@ -1513,16 +1471,6 @@ CREATE TABLE services (
                       value={skillForm.name}
                       onChange={(e) => setSkillForm(prev => ({ ...prev, name: e.target.value }))}
                       placeholder="Photography"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="skill-icon">Icon (Emoji)</Label>
-                    <Input
-                      id="skill-icon"
-                      value={skillForm.icon}
-                      onChange={(e) => setSkillForm(prev => ({ ...prev, icon: e.target.value }))}
-                      placeholder="📸"
                     />
                   </div>
                 </div>

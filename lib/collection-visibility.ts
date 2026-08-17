@@ -13,16 +13,9 @@ export function shouldShowPhotoGrid(loading: boolean, photosCount: number): bool
 
 export function shouldShowEmptyState({
   loading,
-  collectionType,
   childCollectionsCount,
   photosCount,
 }: EmptyStateParams): boolean {
   if (loading) return false
-  if (collectionType === 'main') {
-    return childCollectionsCount === 0 && photosCount === 0
-  }
-  if (collectionType === 'sub') {
-    return photosCount === 0
-  }
-  return false
+  return childCollectionsCount === 0 && photosCount === 0
 }
