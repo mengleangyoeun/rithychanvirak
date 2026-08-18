@@ -10,8 +10,10 @@ import { useScrollRestoration } from "@/hooks/use-scroll-restoration"
 
 export function LayoutWrapper({
   children,
+  footer,
 }: {
   children: React.ReactNode
+  footer?: React.ReactNode
 }) {
   const pathname = usePathname()
   const isStudioRoute = pathname?.startsWith('/studio')
@@ -32,6 +34,7 @@ export function LayoutWrapper({
       <div className="min-h-screen flex flex-col">
         <Header />
         <div className="flex-1">{children}</div>
+        {footer}
         <ScrollToTop />
       </div>
     </ErrorBoundary>

@@ -7,6 +7,7 @@ import "@fontsource/kantumruy-pro/600.css";
 import "@fontsource/kantumruy-pro/700.css";
 import "./globals.css";
 import { LayoutWrapper } from "@/components/layout-wrapper";
+import { Footer } from "@/components/footer";
 import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({
@@ -67,7 +68,7 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${livvic.variable} antialiased min-h-screen flex flex-col`}
       >
-        <LayoutWrapper>{children}</LayoutWrapper>
+        <LayoutWrapper footer={<Footer />}>{children}</LayoutWrapper>
         <Analytics />
       </body>
     </html>
